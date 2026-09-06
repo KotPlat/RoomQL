@@ -42,15 +42,9 @@ class QueryBuilder {
     fun build(): RoomQlQuery {
         val table = fromTable ?: throw RoomQlException("from() must be called before build()")
 
-        if (limitValue != null && limitValue!! <= 0) {
-            throw RoomQlException("limit() must be a positive integer, got $limitValue")
-        }
-        if (offsetValue != null && limitValue == null) {
-            throw RoomQlException("offset() requires limit() to be set")
-        }
-        if (havingScope != null && groupByColumn == null) {
-            throw RoomQlException("having() requires groupBy() to be set")
-        }
+        roomQlCheck(limitValue == null || limitValue!! > 0) { "limit() must be a positive integer, got $limitValue" }
+        roomQlCheck(offsetValue == null || limitValue != null) { "offset() requires limit() to be set" }
+        roomQlCheck(havingScope == null || groupByColumn != null) { "having() requires groupBy() to be set" }
 
         val args = mutableListOf<Any?>()
         val sql = buildString {
