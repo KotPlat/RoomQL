@@ -9,6 +9,7 @@ compileTesting = "0.5.1"
 [libraries]
 room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
 room-ktx     = { module = "androidx.room:room-ktx",     version.ref = "room" }
+room-common  = { module = "androidx.room:room-common",  version.ref = "room" }
 
 ksp-api        = { module = "com.google.devtools.ksp:symbol-processing-api", version.ref = "ksp" }
 kotlinpoet     = { module = "com.squareup:kotlinpoet",     version.ref = "kotlinpoet" }
