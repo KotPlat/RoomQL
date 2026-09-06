@@ -40,8 +40,7 @@ class RoomQlProcessor(private val environment: SymbolProcessorEnvironment) : Sym
 
         val typeSpec = TypeSpec.objectBuilder(objectName)
             .apply {
-                classDecl.declarations
-                    .filterIsInstance<KSPropertyDeclaration>()
+                classDecl.getAllProperties()
                     .forEach { prop ->
                         val columnType = COLUMN_CLASS.parameterizedBy(prop.type.resolve().toTypeName())
                         addProperty(
@@ -78,7 +77,7 @@ private fun findAnnotationArg(
     .firstOrNull { it.annotationType.resolve().declaration.qualifiedName?.asString() == annotationFqn }
     ?.arguments
     ?.firstOrNull { it.name?.asString() == argName }
-    ?.value as? String
+    ?.value?.let { it as? String ?: error("Expected String for annotation arg '$argName' but got ${it::class.simpleName}") }
 
 class RoomQlProcessorProvider : SymbolProcessorProvider {
     override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor =
