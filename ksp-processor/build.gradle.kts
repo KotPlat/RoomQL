@@ -14,6 +14,9 @@ dependencies {
 
     testImplementation(libs.kotlin.test)
     testImplementation(libs.junit5)
+    testImplementation(libs.kotlin.compile.testing.ksp)
+    testImplementation("androidx.room:room-common:2.6.1")
+    testImplementation(project(":runtime"))
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
