@@ -5,13 +5,79 @@ import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.processing.SymbolProcessorProvider
 import com.google.devtools.ksp.symbol.KSAnnotated
+import com.google.devtools.ksp.symbol.KSAnnotation
+import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSPropertyDeclaration
+import com.google.devtools.ksp.validate
+import com.squareup.kotlinpoet.ClassName
+import com.squareup.kotlinpoet.FileSpec
+import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
+import com.squareup.kotlinpoet.PropertySpec
+import com.squareup.kotlinpoet.TypeSpec
+import com.squareup.kotlinpoet.ksp.toTypeName
+import com.squareup.kotlinpoet.ksp.writeTo
+
+private const val ENTITY_ANNOTATION = "androidx.room.Entity"
+private const val COLUMN_INFO_ANNOTATION = "androidx.room.ColumnInfo"
+private val COLUMN_CLASS = ClassName("com.roomql.runtime", "Column")
 
 class RoomQlProcessor(private val environment: SymbolProcessorEnvironment) : SymbolProcessor {
     override fun process(resolver: Resolver): List<KSAnnotated> {
-        // Implementation in subsequent slices
-        return emptyList()
+        val deferred = mutableListOf<KSAnnotated>()
+        resolver.getSymbolsWithAnnotation(ENTITY_ANNOTATION)
+            .filterIsInstance<KSClassDeclaration>()
+            .forEach { classDecl ->
+                if (classDecl.validate()) generateColumnsObject(classDecl)
+                else deferred.add(classDecl)
+            }
+        return deferred
+    }
+
+    private fun generateColumnsObject(classDecl: KSClassDeclaration) {
+        val tableName = extractTableName(classDecl)
+        val packageName = classDecl.packageName.asString()
+        val objectName = "${classDecl.simpleName.asString()}Columns"
+
+        val typeSpec = TypeSpec.objectBuilder(objectName)
+            .apply {
+                classDecl.getAllProperties()
+                    .forEach { prop ->
+                        val columnType = COLUMN_CLASS.parameterizedBy(prop.type.resolve().toTypeName())
+                        addProperty(
+                            PropertySpec.builder(prop.simpleName.asString(), columnType)
+                                .initializer("%T(%S, %S)", COLUMN_CLASS, extractColumnName(prop), tableName)
+                                .build()
+                        )
+                    }
+            }
+            .build()
+
+        FileSpec.builder(packageName, objectName)
+            .addType(typeSpec)
+            .build()
+            .writeTo(environment.codeGenerator, aggregating = false)
+    }
+
+    private fun extractTableName(classDecl: KSClassDeclaration): String {
+        val explicit = findAnnotationArg(classDecl.annotations, ENTITY_ANNOTATION, "tableName")
+        return if (explicit.isNullOrEmpty()) classDecl.simpleName.asString() else explicit
+    }
+
+    private fun extractColumnName(prop: KSPropertyDeclaration): String {
+        val explicit = findAnnotationArg(prop.annotations, COLUMN_INFO_ANNOTATION, "name")
+        return if (explicit.isNullOrEmpty()) prop.simpleName.asString() else explicit
     }
 }
+
+private fun findAnnotationArg(
+    annotations: Sequence<KSAnnotation>,
+    annotationFqn: String,
+    argName: String,
+): String? = annotations
+    .firstOrNull { it.annotationType.resolve().declaration.qualifiedName?.asString() == annotationFqn }
+    ?.arguments
+    ?.firstOrNull { it.name?.asString() == argName }
+    ?.value?.let { it as? String ?: error("Expected String for annotation arg '$argName' but got ${it::class.simpleName}") }
 
 class RoomQlProcessorProvider : SymbolProcessorProvider {
     override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor =

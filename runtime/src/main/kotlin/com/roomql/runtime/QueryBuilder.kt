@@ -42,15 +42,9 @@ class QueryBuilder {
     fun build(): RoomQlQuery {
         val table = fromTable ?: throw RoomQlException("from() must be called before build()")
 
-        if (limitValue != null && limitValue!! <= 0) {
-            throw RoomQlException("limit() must be a positive integer, got $limitValue")
-        }
-        if (offsetValue != null && limitValue == null) {
-            throw RoomQlException("offset() requires limit() to be set")
-        }
-        if (havingScope != null && groupByColumn == null) {
-            throw RoomQlException("having() requires groupBy() to be set")
-        }
+        roomQlCheck(limitValue == null || limitValue!! > 0) { "limit() must be a positive integer, got $limitValue" }
+        roomQlCheck(offsetValue == null || limitValue != null) { "offset() requires limit() to be set" }
+        roomQlCheck(havingScope == null || groupByColumn != null) { "having() requires groupBy() to be set" }
 
         val args = mutableListOf<Any?>()
         val sql = buildString {
@@ -59,7 +53,7 @@ class QueryBuilder {
             val whereCondition = whereScope?.build() ?: Condition.Empty
             if (whereCondition !is Condition.Empty) {
                 append(" WHERE ")
-                append(renderCondition(whereCondition, args))
+                renderCondition(whereCondition, args, this)
             }
 
             if (groupByColumn != null) {
@@ -67,7 +61,7 @@ class QueryBuilder {
                 val havingCondition = havingScope?.build() ?: Condition.Empty
                 if (havingCondition !is Condition.Empty) {
                     append(" HAVING ")
-                    append(renderCondition(havingCondition, args))
+                    renderCondition(havingCondition, args, this)
                 }
             }
 
@@ -84,19 +78,34 @@ class QueryBuilder {
     }
 }
 
-private fun renderCondition(condition: Condition, args: MutableList<Any?>): String = when (condition) {
-    is Condition.Empty -> ""
-    is Condition.Simple -> {
-        args.addAll(condition.args)
-        condition.sql
+private const val SQL_AND = " AND "
+private const val SQL_OR = " OR "
+
+private fun renderCondition(condition: Condition, args: MutableList<Any?>, sb: StringBuilder) {
+    when (condition) {
+        is Condition.Empty -> Unit
+        is Condition.Simple -> {
+            args.addAll(condition.args)
+            sb.append(condition.sql)
+        }
+        is Condition.And -> sb.appendConditions(condition.conditions, SQL_AND, args)
+        is Condition.Or -> {
+            sb.append('(')
+            sb.appendConditions(condition.conditions, SQL_OR, args)
+            sb.append(')')
+        }
     }
-    is Condition.And -> condition.conditions
-        .filter { it !is Condition.Empty }
-        .joinToString(" AND ") { renderCondition(it, args) }
-    is Condition.Or -> condition.conditions
-        .filter { it !is Condition.Empty }
-        .joinToString(" OR ") { renderCondition(it, args) }
-        .let { "($it)" }
 }
+
+private fun StringBuilder.appendConditions(
+    conditions: List<Condition>,
+    separator: String,
+    args: MutableList<Any?>,
+) = conditions
+    .filter { it !is Condition.Empty }
+    .forEachIndexed { i, c ->
+        if (i > 0) append(separator)
+        renderCondition(c, args, this)
+    }
 
 fun query(block: QueryBuilder.() -> Unit): RoomQlQuery = QueryBuilder().apply(block).build()
