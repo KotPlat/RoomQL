@@ -2,6 +2,8 @@ package com.roomql.runtime
 
 class QueryBuilder {
     private var fromTable: String? = null
+    private var fromTableColumns: TableColumns? = null
+    private val joins = mutableListOf<JoinClause>()
     private var whereScope: ConditionScope? = null
     private val orderByClauses = mutableListOf<Pair<Column<*>, SortDirection>>()
     private var limitValue: Int? = null
@@ -11,6 +13,16 @@ class QueryBuilder {
 
     fun from(tableName: String) {
         fromTable = tableName
+    }
+
+    fun from(table: TableColumns) {
+        fromTableColumns = table
+        fromTable = table.tableName
+    }
+
+    fun join(table: TableColumns, type: JoinType, block: JoinScope.() -> Unit) {
+        val scope = JoinScope().apply(block)
+        joins.add(JoinClause(table, type, scope.onCondition))
     }
 
     fun where(block: ConditionScope.() -> Unit) {
@@ -48,7 +60,20 @@ class QueryBuilder {
 
         val args = mutableListOf<Any?>()
         val sql = buildString {
-            append("SELECT * FROM $table")
+            if (joins.isNotEmpty() && fromTableColumns != null) {
+                appendSelectWithAliasing(fromTableColumns!!, joins)
+            } else {
+                append("SELECT *")
+            }
+            append(" FROM $table")
+
+            for (join in joins) {
+                append(" ${join.type.keyword} JOIN ${join.table.tableName}")
+                if (join.onCondition !is Condition.Empty) {
+                    append(" ON ")
+                    renderCondition(join.onCondition, args, this)
+                }
+            }
 
             val whereCondition = whereScope?.build() ?: Condition.Empty
             if (whereCondition !is Condition.Empty) {
@@ -109,3 +134,21 @@ private fun StringBuilder.appendConditions(
     }
 
 fun query(block: QueryBuilder.() -> Unit): RoomQlQuery = QueryBuilder().apply(block).build()
+
+private fun StringBuilder.appendSelectWithAliasing(primary: TableColumns, joins: List<JoinClause>) {
+    val allTables = listOf(primary) + joins.map { it.table }
+    val nameCount = allTables.flatMap { it.allColumnNames }.groupBy { it }.mapValues { it.value.size }
+    append("SELECT ")
+    var first = true
+    for (table in allTables) {
+        for (col in table.allColumnNames) {
+            if (!first) append(", ")
+            first = false
+            if ((nameCount[col] ?: 0) > 1) {
+                append("${table.tableName}.$col AS ${table.tableName}__$col")
+            } else {
+                append(col)
+            }
+        }
+    }
+}

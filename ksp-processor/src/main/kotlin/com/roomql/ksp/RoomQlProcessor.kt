@@ -11,15 +11,18 @@ import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.google.devtools.ksp.validate
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FileSpec
+import com.squareup.kotlinpoet.KModifier
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.PropertySpec
 import com.squareup.kotlinpoet.TypeSpec
+import com.squareup.kotlinpoet.asClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
 import com.squareup.kotlinpoet.ksp.writeTo
 
 private const val ENTITY_ANNOTATION = "androidx.room.Entity"
 private const val COLUMN_INFO_ANNOTATION = "androidx.room.ColumnInfo"
 private val COLUMN_CLASS = ClassName("com.roomql.runtime", "Column")
+private val TABLE_COLUMNS_CLASS = ClassName("com.roomql.runtime", "TableColumns")
 
 class RoomQlProcessor(private val environment: SymbolProcessorEnvironment) : SymbolProcessor {
     override fun process(resolver: Resolver): List<KSAnnotated> {
@@ -38,17 +41,30 @@ class RoomQlProcessor(private val environment: SymbolProcessorEnvironment) : Sym
         val packageName = classDecl.packageName.asString()
         val objectName = "${classDecl.simpleName.asString()}Columns"
 
+        val props = classDecl.getAllProperties().toList()
+        val columnNames = props.map { extractColumnName(it) }
+
         val typeSpec = TypeSpec.objectBuilder(objectName)
+            .addSuperinterface(TABLE_COLUMNS_CLASS)
             .apply {
-                classDecl.getAllProperties()
-                    .forEach { prop ->
-                        val columnType = COLUMN_CLASS.parameterizedBy(prop.type.resolve().toTypeName())
-                        addProperty(
-                            PropertySpec.builder(prop.simpleName.asString(), columnType)
-                                .initializer("%T(%S, %S)", COLUMN_CLASS, extractColumnName(prop), tableName)
-                                .build()
-                        )
-                    }
+                addProperty(
+                    PropertySpec.builder("tableName", String::class, KModifier.OVERRIDE)
+                        .initializer("%S", tableName)
+                        .build()
+                )
+                addProperty(
+                    PropertySpec.builder("allColumnNames", List::class.asClassName().parameterizedBy(String::class.asClassName()), KModifier.OVERRIDE)
+                        .initializer("listOf(${columnNames.joinToString(", ") { "%S" }})", *columnNames.toTypedArray())
+                        .build()
+                )
+                props.forEach { prop ->
+                    val columnType = COLUMN_CLASS.parameterizedBy(prop.type.resolve().toTypeName())
+                    addProperty(
+                        PropertySpec.builder(prop.simpleName.asString(), columnType)
+                            .initializer("%T(%S, %S)", COLUMN_CLASS, extractColumnName(prop), tableName)
+                            .build()
+                    )
+                }
             }
             .build()
 

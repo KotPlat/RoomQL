@@ -164,6 +164,36 @@ class RoomQlProcessorTest {
         assertTrue(generated.contains("package com.example.data") || generated.contains("package com.example.`data`"))
     }
 
+    // --- generated object implements TableColumns ---
+
+    @Test
+    fun `generated object implements TableColumns with tableName and allColumnNames`() {
+        val entity = SourceFile.kotlin(
+            "ItemEntity.kt", """
+            package test
+            import androidx.room.Entity
+            import androidx.room.ColumnInfo
+
+            @Entity(tableName = "items")
+            data class ItemEntity(
+                val id: Int,
+                @ColumnInfo(name = "item_name") val name: String
+            )
+        """
+        )
+
+        val (result, compilation) = compile(entity)
+
+        assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode)
+
+        val generated = findGeneratedFile(compilation, "ItemEntityColumns.kt").readText()
+        assertTrue("TableColumns" in generated)
+        assertTrue(""""items"""" in generated)
+        assertTrue("allColumnNames" in generated)
+        assertTrue(""""id"""" in generated)
+        assertTrue(""""item_name"""" in generated)
+    }
+
     // --- multiple entities generate multiple files ---
 
     @Test
