@@ -54,8 +54,8 @@ class RoomQlProcessorTest {
 
         assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode)
 
-        val generated = findGeneratedFile(compilation, "UserEntityColumns.kt").readText()
-        assertTrue("UserEntityColumns" in generated)
+        val generated = findGeneratedFile(compilation, "UserEntityTable.kt").readText()
+        assertTrue("UserEntityTable" in generated)
         assertTrue(""""id", "users"""" in generated || """"id","users"""" in generated.replace(" ", ""))
         assertTrue(""""name", "users"""" in generated || """"name","users"""" in generated.replace(" ", ""))
         assertTrue(""""age", "users"""" in generated || """"age","users"""" in generated.replace(" ", ""))
@@ -82,8 +82,8 @@ class RoomQlProcessorTest {
 
         assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode)
 
-        val generated = findGeneratedFile(compilation, "ProductEntityColumns.kt").readText()
-        assertTrue("ProductEntityColumns" in generated)
+        val generated = findGeneratedFile(compilation, "ProductEntityTable.kt").readText()
+        assertTrue("ProductEntityTable" in generated)
         assertTrue(""""ProductEntity"""" in generated)
     }
 
@@ -109,7 +109,7 @@ class RoomQlProcessorTest {
 
         assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode)
 
-        val generated = findGeneratedFile(compilation, "OrderEntityColumns.kt").readText()
+        val generated = findGeneratedFile(compilation, "OrderEntityTable.kt").readText()
         assertTrue(""""created_at"""" in generated)
         assertTrue("createdAt" in generated)
     }
@@ -135,7 +135,7 @@ class RoomQlProcessorTest {
 
         assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode)
 
-        val generated = findGeneratedFile(compilation, "NullableEntityColumns.kt").readText()
+        val generated = findGeneratedFile(compilation, "NullableEntityTable.kt").readText()
         assertTrue("String?" in generated)
         assertTrue("Column<Int>" in generated)
     }
@@ -160,7 +160,7 @@ class RoomQlProcessorTest {
 
         assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode)
 
-        val generated = findGeneratedFile(compilation, "RoomEntityColumns.kt").readText()
+        val generated = findGeneratedFile(compilation, "RoomEntityTable.kt").readText()
         assertTrue(generated.contains("package com.example.data") || generated.contains("package com.example.`data`"))
     }
 
@@ -186,7 +186,7 @@ class RoomQlProcessorTest {
 
         assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode)
 
-        val generated = findGeneratedFile(compilation, "ItemEntityColumns.kt").readText()
+        val generated = findGeneratedFile(compilation, "ItemEntityTable.kt").readText()
         assertTrue("TableColumns" in generated)
         assertTrue(""""items"""" in generated)
         assertTrue("allColumnNames" in generated)
@@ -220,7 +220,7 @@ class RoomQlProcessorTest {
             .map { it.name }
             .toSet()
 
-        assertTrue("UserEntityColumns.kt" in generatedNames)
-        assertTrue("PostEntityColumns.kt" in generatedNames)
+        assertTrue("UserEntityTable.kt" in generatedNames)
+        assertTrue("PostEntityTable.kt" in generatedNames)
     }
 }
