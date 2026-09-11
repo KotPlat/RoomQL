@@ -31,6 +31,7 @@ kotlin {
 dependencies {
     implementation(project(":annotations"))
     implementation(project(":runtime"))
+    implementation(project(":runtime-android"))
 
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)

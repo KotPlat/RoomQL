@@ -1,18 +1,10 @@
 package com.roomql.sample
 
-import androidx.sqlite.db.SimpleSQLiteQuery
-import androidx.sqlite.db.SupportSQLiteQuery
+import com.roomql.android.toQuery
 import com.roomql.runtime.JoinType
-import com.roomql.runtime.RoomQlQuery
 import com.roomql.runtime.SortDirection
 import com.roomql.runtime.query
 import kotlinx.coroutines.flow.Flow
-
-/**
- * Bridges a [RoomQlQuery] (pure-JVM, produced by the `:runtime` DSL) into the
- * [SupportSQLiteQuery] that Room's `@RawQuery` expects.
- */
-fun RoomQlQuery.toSupportQuery(): SupportSQLiteQuery = SimpleSQLiteQuery(sql, args)
 
 /**
  * Demonstrates Mode B end to end: build a dynamic query with `query { }` and hand the
@@ -32,7 +24,7 @@ class UserRepository(
             }
             orderBy(UserEntityColumns.age, SortDirection.DESC)
         }
-        return userDao.search(q.toSupportQuery())
+        return userDao.search(q.toQuery())
     }
 
     suspend fun searchUsersSuspend(status: String?): List<UserEntity> {
@@ -40,7 +32,7 @@ class UserRepository(
             from(UserEntityColumns)
             where { UserEntityColumns.status eq status }
         }
-        return userDao.searchSuspend(q.toSupportQuery())
+        return userDao.searchSuspend(q.toQuery())
     }
 
     fun observeUsers(minAge: Int?): Flow<List<UserEntity>> {
@@ -48,7 +40,7 @@ class UserRepository(
             from(UserEntityColumns)
             where { UserEntityColumns.age gte minAge }
         }
-        return userDao.observe(q.toSupportQuery())
+        return userDao.observe(q.toQuery())
     }
 
     fun usersWithOrders(): List<UserOrder> {
@@ -58,6 +50,6 @@ class UserRepository(
                 on { UserEntityColumns.id eq OrderEntityColumns.userId }
             }
         }
-        return orderDao.usersWithOrders(q.toSupportQuery())
+        return orderDao.usersWithOrders(q.toQuery())
     }
 }
