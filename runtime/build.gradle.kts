@@ -1,9 +1,17 @@
 plugins {
     alias(libs.plugins.kotlin.jvm)
+    `maven-publish`
 }
+
+group = "com.github.ahmednobii.RoomQL"
+version = System.getenv("VERSION") ?: "unspecified"
 
 kotlin {
     jvmToolchain(17)
+}
+
+java {
+    withSourcesJar()
 }
 
 dependencies {
@@ -14,4 +22,13 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+}
+
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            artifactId = "roomql-runtime"
+            from(components["java"])
+        }
+    }
 }

@@ -3,6 +3,7 @@ package com.roomql.runtime
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class QueryBuilderTest {
 
@@ -348,6 +349,144 @@ class QueryBuilderTest {
                 having { Column<Int>("age", "users") gt 18 }
             }
         }
+    }
+
+    // --- Multi-call where { } merges ---
+
+    @Test
+    fun `multiple where calls merge into single AND list`() {
+        val result = query {
+            from("users")
+            where { Column<Int>("age", "users") gt 18 }
+            where { Column<String>("status", "users") eq "active" }
+        }
+        assertEquals("SELECT * FROM users WHERE age > ? AND status = ?", result.sql)
+        assertEquals(listOf(18, "active"), result.args.toList())
+    }
+
+    // --- JOIN ---
+
+    private fun tableOf(name: String, vararg cols: String) = object : TableColumns {
+        override val tableName = name
+        override val allColumnNames = cols.toList()
+    }
+
+    @Test
+    fun `inner join produces INNER JOIN clause`() {
+        val users = tableOf("users", "id", "name")
+        val orders = tableOf("orders", "order_id", "user_id")
+        val result = query {
+            from(users)
+            join(orders, JoinType.INNER) {
+                on { Column<Long>("id", "users") eq Column<Long>("user_id", "orders") }
+            }
+        }
+        assertEquals(
+            "SELECT id, name, order_id, user_id FROM users INNER JOIN orders ON users.id = orders.user_id",
+            result.sql
+        )
+    }
+
+    @Test
+    fun `left join produces LEFT JOIN clause`() {
+        val users = tableOf("users", "id", "name")
+        val profiles = tableOf("profiles", "profile_id", "bio")
+        val result = query {
+            from(users)
+            join(profiles, JoinType.LEFT) {
+                on { Column<Long>("id", "users") eq Column<Long>("profile_id", "profiles") }
+            }
+        }
+        assertEquals(
+            "SELECT id, name, profile_id, bio FROM users LEFT JOIN profiles ON users.id = profiles.profile_id",
+            result.sql
+        )
+    }
+
+    @Test
+    fun `chained joins produce multiple JOIN clauses`() {
+        val users = tableOf("users", "id", "name")
+        val orders = tableOf("orders", "order_id", "user_id")
+        val items = tableOf("items", "item_id", "order_ref")
+        val result = query {
+            from(users)
+            join(orders, JoinType.INNER) {
+                on { Column<Long>("id", "users") eq Column<Long>("user_id", "orders") }
+            }
+            join(items, JoinType.LEFT) {
+                on { Column<Long>("order_id", "orders") eq Column<Long>("order_ref", "items") }
+            }
+        }
+        assertEquals(
+            "SELECT id, name, order_id, user_id, item_id, order_ref FROM users" +
+                " INNER JOIN orders ON users.id = orders.user_id" +
+                " LEFT JOIN items ON orders.order_id = items.order_ref",
+            result.sql
+        )
+    }
+
+    @Test
+    fun `conflicting column names are aliased with table prefix`() {
+        val users = tableOf("users", "id", "name")
+        val orders = tableOf("orders", "id", "user_id", "amount")
+        val result = query {
+            from(users)
+            join(orders, JoinType.INNER) {
+                on { Column<Long>("id", "users") eq Column<Long>("user_id", "orders") }
+            }
+        }
+        assertEquals(
+            "SELECT users.id AS users__id, name, orders.id AS orders__id, user_id, amount" +
+                " FROM users INNER JOIN orders ON users.id = orders.user_id",
+            result.sql
+        )
+    }
+
+    @Test
+    fun `non-conflicting columns are not aliased`() {
+        val users = tableOf("users", "id", "name")
+        val addresses = tableOf("addresses", "address_id", "city")
+        val result = query {
+            from(users)
+            join(addresses, JoinType.INNER) {
+                on { Column<Long>("id", "users") eq Column<Long>("address_id", "addresses") }
+            }
+        }
+        val sql = result.sql
+        assertTrue("AS" !in sql, "Non-conflicting columns should not be aliased: $sql")
+        assertTrue("SELECT id, name, address_id, city" in sql)
+    }
+
+    @Test
+    fun `join without column info falls back to SELECT star`() {
+        val result = query {
+            from("users")
+            join(tableOf("orders", "id", "user_id"), JoinType.INNER) {
+                on { Column<Long>("id", "users") eq Column<Long>("user_id", "orders") }
+            }
+        }
+        assertTrue(result.sql.startsWith("SELECT * FROM users"))
+        assertTrue("INNER JOIN orders ON" in result.sql)
+    }
+
+    @Test
+    fun `join combined with where clause`() {
+        val users = tableOf("users", "id", "name")
+        val orders = tableOf("orders", "order_id", "user_id", "status")
+        val result = query {
+            from(users)
+            join(orders, JoinType.INNER) {
+                on { Column<Long>("id", "users") eq Column<Long>("user_id", "orders") }
+            }
+            where { Column<String>("status", "orders") eq "active" }
+        }
+        assertEquals(
+            "SELECT id, name, order_id, user_id, status" +
+                " FROM users INNER JOIN orders ON users.id = orders.user_id" +
+                " WHERE status = ?",
+            result.sql
+        )
+        assertEquals(listOf("active"), result.args.toList())
     }
 
     // --- Full query combining multiple clauses ---
