@@ -2,7 +2,7 @@
 kotlin = "2.0.21"
 ksp = "2.0.21-1.0.28"
 room = "2.6.1"
-kotlinpoet = "1.18.1"
+kotlinpoet = "2.4.0"
 junit5 = "5.10.2"
 compileTesting = "0.5.1"
 agp = "8.11.1"
