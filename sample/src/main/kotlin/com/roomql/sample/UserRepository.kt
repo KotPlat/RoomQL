@@ -17,37 +17,37 @@ class UserRepository(
 ) {
     fun searchUsers(minAge: Int?, status: String?): List<UserEntity> {
         val q = query {
-            from(UserEntityColumns)
+            from(UserEntityTable)
             where {
-                UserEntityColumns.age gte minAge
-                UserEntityColumns.status eq status
+                UserEntityTable.age gte minAge
+                UserEntityTable.status eq status
             }
-            orderBy(UserEntityColumns.age, SortDirection.DESC)
+            orderBy(UserEntityTable.age, SortDirection.DESC)
         }
         return userDao.search(q.toQuery())
     }
 
     suspend fun searchUsersSuspend(status: String?): List<UserEntity> {
         val q = query {
-            from(UserEntityColumns)
-            where { UserEntityColumns.status eq status }
+            from(UserEntityTable)
+            where { UserEntityTable.status eq status }
         }
         return userDao.searchSuspend(q.toQuery())
     }
 
     fun observeUsers(minAge: Int?): Flow<List<UserEntity>> {
         val q = query {
-            from(UserEntityColumns)
-            where { UserEntityColumns.age gte minAge }
+            from(UserEntityTable)
+            where { UserEntityTable.age gte minAge }
         }
         return userDao.observe(q.toQuery())
     }
 
     fun usersWithOrders(): List<UserOrder> {
         val q = query {
-            from(UserEntityColumns)
-            join(OrderEntityColumns, JoinType.INNER) {
-                on { UserEntityColumns.id eq OrderEntityColumns.userId }
+            from(UserEntityTable)
+            join(OrderEntityTable, JoinType.INNER) {
+                on { UserEntityTable.id eq OrderEntityTable.userId }
             }
         }
         return orderDao.usersWithOrders(q.toQuery())

@@ -39,7 +39,7 @@ class RoomQlProcessor(private val environment: SymbolProcessorEnvironment) : Sym
     private fun generateColumnsObject(classDecl: KSClassDeclaration) {
         val tableName = extractTableName(classDecl)
         val packageName = classDecl.packageName.asString()
-        val objectName = "${classDecl.simpleName.asString()}Columns"
+        val objectName = "${classDecl.simpleName.asString()}Table"
 
         val props = classDecl.getAllProperties().toList()
         val columnNames = props.map { extractColumnName(it) }
