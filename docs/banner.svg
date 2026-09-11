@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 200" width="860" height="200">
+  <rect width="860" height="200" fill="#161616"/>
+
+  <!-- Icon box -->
+  <rect x="30" y="20" width="160" height="160" rx="28" fill="#1c1c1e"/>
+
+  <!-- > chevron -->
+  <path d="M 65 78 L 100 110 L 65 142" stroke="#3ddc84" stroke-width="11" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- = lines (query rows) -->
+  <line x1="112" y1="97"  x2="158" y2="97"  stroke="#3ddc84" stroke-width="9" stroke-linecap="round"/>
+  <line x1="112" y1="118" x2="145" y2="118" stroke="#3ddc84" stroke-width="9" stroke-linecap="round"/>
+
+  <!-- wordmark: room (white) + ql (green) -->
+  <text font-family="'Courier New', Courier, monospace" font-size="80" font-weight="800" letter-spacing="-1">
+    <tspan x="215" y="128" fill="#ffffff">room</tspan><tspan fill="#3ddc84">ql</tspan>
+  </text>
+
+  <!-- subtitle -->
+  <text x="215" y="163" font-family="'Courier New', Courier, monospace" font-size="17" fill="#3ddc84" opacity="0.85">$ type-safe room query dsl</text>
+</svg>

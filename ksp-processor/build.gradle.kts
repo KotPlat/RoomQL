@@ -3,7 +3,7 @@ plugins {
     `maven-publish`
 }
 
-group = "com.github.ahmednobii.room-query-beauty"
+group = "com.github.ahmednobii.RoomQL"
 version = System.getenv("VERSION") ?: "unspecified"
 
 kotlin {
