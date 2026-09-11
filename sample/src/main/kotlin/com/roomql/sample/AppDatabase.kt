@@ -13,15 +13,15 @@ interface UserDao {
     @Insert
     fun insertAll(vararg users: UserEntity)
 
-    /** Mode B: one-shot query built by the caller via `query { }`. */
+    /** One-shot query built by the caller via `query { }`. */
     @RawQuery
     fun search(query: SupportSQLiteQuery): List<UserEntity>
 
-    /** Mode B suspend variant. */
+    /** Suspend variant. */
     @RawQuery
     suspend fun searchSuspend(query: SupportSQLiteQuery): List<UserEntity>
 
-    /** Mode B reactive variant; `observedEntities` declared manually (see #6). */
+    /** Reactive variant; `observedEntities` must be declared manually. */
     @RawQuery(observedEntities = [UserEntity::class])
     fun observe(query: SupportSQLiteQuery): Flow<List<UserEntity>>
 }
@@ -31,7 +31,7 @@ interface OrderDao {
     @Insert
     fun insertAll(vararg orders: OrderEntity)
 
-    /** Mode B JOIN: result mapped into the caller-supplied [UserOrder] POJO. */
+    /** JOIN: result mapped into the caller-supplied [UserOrder] POJO. */
     @RawQuery
     fun usersWithOrders(query: SupportSQLiteQuery): List<UserOrder>
 }

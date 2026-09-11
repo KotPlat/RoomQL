@@ -38,7 +38,7 @@ RoomQL has exactly three moving parts:
 @Entity ──(KSP)──▶ UserEntityTable ──(query { })──▶ RoomQlQuery ──(.toQuery())──▶ SupportSQLiteQuery ──▶ @RawQuery
 ```
 
-You always write Room's `@RawQuery` methods yourself (this is "Mode B"). RoomQL never generates DAO code.
+You always write Room's `@RawQuery` methods yourself — RoomQL never generates DAO code.
 
 ---
 

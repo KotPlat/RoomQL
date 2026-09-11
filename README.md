@@ -54,7 +54,7 @@ dependencyResolutionManagement {
 }
 ```
 
-A Mode B setup needs three artifacts (version catalog form):
+A typical setup needs three artifacts (version catalog form):
 
 ```toml
 [versions]
@@ -102,7 +102,7 @@ data class UserEntity(
 
 `@ColumnInfo(name = "...")` and `@Entity(tableName = "...")` are respected — the generated refs use the real SQL names.
 
-### 2. Declare a `@RawQuery` DAO method (Mode B)
+### 2. Declare a `@RawQuery` DAO method
 
 RoomQL uses Room's own `@RawQuery`. You own the DAO surface:
 
@@ -235,11 +235,11 @@ Be aware of these before adopting:
 | `:ksp-processor` | `roomql-ksp-processor` | generates the `*Table` objects |
 | `:annotations` | `roomql-annotations` | `@QueryFunction` only — **unused in v1**, reserved for the #13 exploration |
 
-> **Integration mode.** RoomQL v1 uses Room's manual `@RawQuery` (you declare the method, call `query { }`, pass `.toQuery()`). A zero-boilerplate KSP-generated mode ("Mode A") was explored and dropped — KSP cannot read function bodies, so it couldn't infer the query or `observedEntities`. See issues #6 / #13. The `@QueryFunction` annotation is retained for the potential compiler-plugin revival of Mode A but does nothing today.
+> **Integration.** RoomQL v1 uses Room's manual `@RawQuery` (you declare the method, call `query { }`, pass `.toQuery()`). A zero-boilerplate KSP-generated integration was explored and dropped — KSP cannot read function bodies, so it couldn't infer the query or `observedEntities`. See issues #6 / #13. The `@QueryFunction` annotation is retained for a potential compiler-plugin revival but does nothing today.
 
 ## Working example
 
-The [`:sample`](sample) module is a runnable, tested end-to-end reference: real `@Entity` classes, a `@Database`, Mode B `@RawQuery` DAOs, and Robolectric tests that exercise the whole stack (generated `*Table` → `query { }` → `.toQuery()` → in-memory Room) — including nullable-filter skipping, JOIN mapping, and `Flow` re-emission. Run it with:
+The [`:sample`](sample) module is a runnable, tested end-to-end reference: real `@Entity` classes, a `@Database`, manual `@RawQuery` DAOs, and Robolectric tests that exercise the whole stack (generated `*Table` → `query { }` → `.toQuery()` → in-memory Room) — including nullable-filter skipping, JOIN mapping, and `Flow` re-emission. Run it with:
 
 ```
 ./gradlew :sample:testDebugUnitTest
