@@ -1,6 +1,6 @@
 package com.roomql.runtime
 
-interface TableColumns {
+interface EntityTable {
     val tableName: String
     val allColumnNames: List<String>
 }

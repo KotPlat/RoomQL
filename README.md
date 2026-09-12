@@ -99,7 +99,7 @@ data class UserEntity(
     val age: Int,
     val status: String,
 )
-// KSP generates: object UserEntityTable : TableColumns { id; name; age; status; ... }
+// KSP generates: object UserEntityTable : EntityTable { id; name; age; status; ... }
 ```
 
 `@ColumnInfo(name = "...")` and `@Entity(tableName = "...")` are respected — the generated refs use the real SQL names.
