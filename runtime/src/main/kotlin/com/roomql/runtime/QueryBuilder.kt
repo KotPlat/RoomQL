@@ -58,10 +58,11 @@ class QueryBuilder {
         roomQlCheck(offsetValue == null || limitValue != null) { "offset() requires limit() to be set" }
         roomQlCheck(havingScope == null || groupByColumn != null) { "having() requires groupBy() to be set" }
 
+        val collidingNames = collidingColumnNames()
         val args = mutableListOf<Any?>()
         val sql = buildString {
             if (joins.isNotEmpty() && fromTableColumns != null) {
-                appendSelectWithAliasing(fromTableColumns!!, joins)
+                appendSelectWithAliasing(fromTableColumns!!, joins, collidingNames)
             } else {
                 append("SELECT *")
             }
@@ -71,28 +72,28 @@ class QueryBuilder {
                 append(" ${join.type.keyword} JOIN ${join.table.tableName}")
                 if (join.onCondition !is Condition.Empty) {
                     append(" ON ")
-                    renderCondition(join.onCondition, args, this)
+                    renderCondition(join.onCondition, args, this, collidingNames)
                 }
             }
 
             val whereCondition = whereScope?.build() ?: Condition.Empty
             if (whereCondition !is Condition.Empty) {
                 append(" WHERE ")
-                renderCondition(whereCondition, args, this)
+                renderCondition(whereCondition, args, this, collidingNames)
             }
 
             if (groupByColumn != null) {
-                append(" GROUP BY ${groupByColumn!!.columnName}")
+                append(" GROUP BY ${groupByColumn!!.render(collidingNames)}")
                 val havingCondition = havingScope?.build() ?: Condition.Empty
                 if (havingCondition !is Condition.Empty) {
                     append(" HAVING ")
-                    renderCondition(havingCondition, args, this)
+                    renderCondition(havingCondition, args, this, collidingNames)
                 }
             }
 
             if (orderByClauses.isNotEmpty()) {
                 append(" ORDER BY ")
-                append(orderByClauses.joinToString(", ") { (col, dir) -> "${col.columnName} $dir" })
+                append(orderByClauses.joinToString(", ") { (col, dir) -> "${col.render(collidingNames)} $dir" })
             }
 
             limitValue?.let { append(" LIMIT $it") }
@@ -101,22 +102,40 @@ class QueryBuilder {
 
         return RoomQlQuery(sql, args.toTypedArray())
     }
+
+    /** Column names shared by more than one table in this query's FROM + JOINs. Empty when there are no joins. */
+    private fun collidingColumnNames(): Set<String> {
+        val primary = fromTableColumns ?: return emptySet()
+        if (joins.isEmpty()) return emptySet()
+        val allTables = listOf(primary) + joins.map { it.table }
+        return allTables.flatMap { it.allColumnNames }
+            .groupingBy { it }
+            .eachCount()
+            .filterValues { it > 1 }
+            .keys
+    }
 }
 
 private const val SQL_AND = " AND "
 private const val SQL_OR = " OR "
 
-private fun renderCondition(condition: Condition, args: MutableList<Any?>, sb: StringBuilder) {
+/** Qualifies with the table name only when the column name collides across the joined tables. */
+private fun Column<*>.render(collidingNames: Set<String>): String =
+    if (columnName in collidingNames) "$tableName.$columnName" else columnName
+
+private fun renderCondition(condition: Condition, args: MutableList<Any?>, sb: StringBuilder, collidingNames: Set<String>) {
     when (condition) {
         is Condition.Empty -> Unit
         is Condition.Simple -> {
             args.addAll(condition.args)
-            sb.append(condition.sql)
+            sb.append(condition.template.replace("%s", condition.column.render(collidingNames)))
         }
-        is Condition.And -> sb.appendConditions(condition.conditions, SQL_AND, args)
+        is Condition.ColumnCompare ->
+            sb.append("${condition.left.tableName}.${condition.left.columnName} = ${condition.right.tableName}.${condition.right.columnName}")
+        is Condition.And -> sb.appendConditions(condition.conditions, SQL_AND, args, collidingNames)
         is Condition.Or -> {
             sb.append('(')
-            sb.appendConditions(condition.conditions, SQL_OR, args)
+            sb.appendConditions(condition.conditions, SQL_OR, args, collidingNames)
             sb.append(')')
         }
     }
@@ -126,25 +145,25 @@ private fun StringBuilder.appendConditions(
     conditions: List<Condition>,
     separator: String,
     args: MutableList<Any?>,
+    collidingNames: Set<String>,
 ) = conditions
     .filter { it !is Condition.Empty }
     .forEachIndexed { i, c ->
         if (i > 0) append(separator)
-        renderCondition(c, args, this)
+        renderCondition(c, args, this, collidingNames)
     }
 
 fun query(block: QueryBuilder.() -> Unit): RoomQlQuery = QueryBuilder().apply(block).build()
 
-private fun StringBuilder.appendSelectWithAliasing(primary: TableColumns, joins: List<JoinClause>) {
+private fun StringBuilder.appendSelectWithAliasing(primary: TableColumns, joins: List<JoinClause>, collidingNames: Set<String>) {
     val allTables = listOf(primary) + joins.map { it.table }
-    val nameCount = allTables.flatMap { it.allColumnNames }.groupBy { it }.mapValues { it.value.size }
     append("SELECT ")
     var first = true
     for (table in allTables) {
         for (col in table.allColumnNames) {
             if (!first) append(", ")
             first = false
-            if ((nameCount[col] ?: 0) > 1) {
+            if (col in collidingNames) {
                 append("${table.tableName}.$col AS ${table.tableName}__$col")
             } else {
                 append(col)

@@ -43,12 +43,13 @@ class UserRepository(
         return userDao.observe(q.toQuery())
     }
 
-    fun usersWithOrders(): List<UserOrder> {
+    fun usersWithOrders(status: String? = null): List<UserOrder> {
         val q = query {
             from(UserEntityTable)
             join(OrderEntityTable, JoinType.INNER) {
                 on { UserEntityTable.id eq OrderEntityTable.userId }
             }
+            where { OrderEntityTable.status eq status }
         }
         return orderDao.usersWithOrders(q.toQuery())
     }

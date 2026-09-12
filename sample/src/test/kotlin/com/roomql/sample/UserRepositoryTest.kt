@@ -96,6 +96,22 @@ class UserRepositoryTest {
     }
 
     @Test
+    fun `join filtered on a colliding column name executes against real SQLite`() {
+        seedUsers()
+        db.orderDao().insertAll(
+            OrderEntity(id = 100, userId = 1, total = 42.0, status = "paid"),
+            OrderEntity(id = 101, userId = 3, total = 9.5, status = "pending"),
+        )
+
+        // Both UserEntity and OrderEntity have a "status" column. Filtering on it inside a
+        // joined query used to emit unqualified SQL ("WHERE status = ?"), which SQLite
+        // rejects with "ambiguous column name: status" at execution time.
+        val result = repo.usersWithOrders(status = "paid")
+
+        assertEquals(listOf("Alice"), result.map { it.userName })
+    }
+
+    @Test
     fun `flow re-emits when an observed table changes`() = runBlocking {
         db.userDao().insertAll(UserEntity(id = 1, name = "Alice", age = 30, status = "active"))
 

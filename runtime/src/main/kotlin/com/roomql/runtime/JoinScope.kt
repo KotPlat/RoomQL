@@ -12,9 +12,7 @@ class JoinConditionScope {
     internal val conditions = mutableListOf<Condition>()
 
     infix fun <T> Column<T>.eq(other: Column<T>) {
-        conditions.add(
-            Condition.Simple("${tableName}.${columnName} = ${other.tableName}.${other.columnName}", emptyList())
-        )
+        conditions.add(Condition.ColumnCompare(this, other))
     }
 
     internal fun build(): Condition = when {
