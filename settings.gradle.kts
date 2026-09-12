@@ -14,4 +14,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "RoomQL"
-include(":annotations", ":runtime", ":runtime-android", ":ksp-processor", ":sample")
+include(":runtime", ":runtime-android", ":ksp-processor", ":sample")
