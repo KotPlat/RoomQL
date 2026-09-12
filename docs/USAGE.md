@@ -360,7 +360,7 @@ SELECT users.id AS users__id, name, age, users.status AS users__status,
 FROM users INNER JOIN orders ON users.id = orders.userId
 ```
 
-> Aliasing only happens when the primary table is a generated `*Table` (`from(UserEntityTable)`). With the raw-string overload `from("users")` there is no column metadata, so RoomQL emits `SELECT *` and does **not** alias.
+> Aliasing only happens when the primary table is a generated `*Table` (`from(UserEntityTable)`). With the raw-string overload `from("users")` there is no column metadata, so combining it with `join(...)` throws `RoomQlException` at `build()` rather than silently emitting an unaliased `SELECT *`.
 
 The same collision detection qualifies `where { }`, `having { }`, `groupBy(...)`, and `orderBy(...)` with `table.column` whenever the referenced column's name collides across the joined tables — a unique column name stays bare. `where { OrderEntityTable.status eq "paid" }` on the query above renders `WHERE orders.status = ?`, not the ambiguous `WHERE status = ?`.
 

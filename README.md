@@ -189,7 +189,7 @@ val q = query {
 orderDao.usersWithOrders(q.toQuery())
 ```
 
-When two joined tables share a column name (e.g. both have `id` and `status`), RoomQL aliases them as `users__id`, `orders__id`, etc. — **provided the primary table is given as a generated `*Table`** (`from(UserEntityTable)`). With the raw-string `from("users")` overload there is no column metadata to alias with, so the query falls back to `SELECT *` and collisions are *not* aliased. Your result POJO must map the aliased names for colliding columns:
+When two joined tables share a column name (e.g. both have `id` and `status`), RoomQL aliases them as `users__id`, `orders__id`, etc. — **provided the primary table is given as a generated `*Table`** (`from(UserEntityTable)`). The raw-string `from("users")` overload has no column metadata to alias with, so combining it with `join(...)` throws `RoomQlException` at `build()` rather than silently falling back to an unaliased `SELECT *`. Your result POJO must map the aliased names for colliding columns:
 
 ```kotlin
 data class UserOrder(
