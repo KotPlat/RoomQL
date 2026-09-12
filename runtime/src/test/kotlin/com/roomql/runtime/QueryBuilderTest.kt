@@ -14,6 +14,10 @@ import kotlin.test.assertTrue
  * into this module fails `:runtime:compileKotlin` with
  * "'fun limit(n: Int): Unit' cannot be called in this context with an implicit receiver."
  * Re-check this by hand if `RoomQlDsl` is ever removed from a DSL scope class.
+ *
+ * Similarly, `like`/`notLike`/`contains` are constrained to `Column<T : String?>`, which is also
+ * a compile-time-only guarantee. Verified manually: `Column<Int>("age", "users") like "A%"` fails
+ * `:runtime:compileKotlin` with "Unresolved reference. ... receiver type mismatch."
  */
 class QueryBuilderTest {
 

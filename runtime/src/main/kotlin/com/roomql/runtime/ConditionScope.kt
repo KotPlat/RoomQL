@@ -39,13 +39,13 @@ class ConditionScope {
     infix fun <T> Column<T>.lte(value: T?) =
         add(if (value == null) Condition.Empty else Condition.Simple(this, "%s <= ?", listOf(value)))
 
-    infix fun <T> Column<T>.like(value: String?) =
+    infix fun <T : String?> Column<T>.like(value: String?) =
         add(if (value == null) Condition.Empty else Condition.Simple(this, "%s LIKE ?", listOf(value)))
 
-    infix fun <T> Column<T>.notLike(value: String?) =
+    infix fun <T : String?> Column<T>.notLike(value: String?) =
         add(if (value == null) Condition.Empty else Condition.Simple(this, "%s NOT LIKE ?", listOf(value)))
 
-    infix fun <T> Column<T>.contains(value: String?) =
+    infix fun <T : String?> Column<T>.contains(value: String?) =
         add(if (value == null) Condition.Empty else Condition.Simple(this, "%s LIKE ?", listOf("%$value%")))
 
     fun <T> Column<T>.isNull() = add(Condition.Simple(this, "%s IS NULL", emptyList()))
