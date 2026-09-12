@@ -1,7 +1,7 @@
 package com.roomql.runtime
 
 @RoomQlDsl
-class QueryBuilder {
+public class QueryBuilder {
     private var fromTable: String? = null
     private var fromEntityTable: EntityTable? = null
     private val joins = mutableListOf<JoinClause>()
@@ -12,47 +12,47 @@ class QueryBuilder {
     private var groupByColumn: Column<*>? = null
     private var havingScope: ConditionScope? = null
 
-    fun from(tableName: String) {
+    public fun from(tableName: String) {
         fromTable = tableName
     }
 
-    fun from(table: EntityTable) {
+    public fun from(table: EntityTable) {
         fromEntityTable = table
         fromTable = table.tableName
     }
 
-    fun join(table: EntityTable, type: JoinType, block: JoinScope.() -> Unit) {
+    public fun join(table: EntityTable, type: JoinType, block: JoinScope.() -> Unit) {
         val scope = JoinScope().apply(block)
         joins.add(JoinClause(table, type, scope.onCondition))
     }
 
-    fun where(block: ConditionScope.() -> Unit) {
+    public fun where(block: ConditionScope.() -> Unit) {
         val scope = whereScope ?: ConditionScope().also { whereScope = it }
         scope.apply(block)
     }
 
-    fun orderBy(column: Column<*>, direction: SortDirection) {
+    public fun orderBy(column: Column<*>, direction: SortDirection) {
         orderByClauses.add(column to direction)
     }
 
-    fun limit(n: Int) {
+    public fun limit(n: Int) {
         limitValue = n
     }
 
-    fun offset(n: Int) {
+    public fun offset(n: Int) {
         offsetValue = n
     }
 
-    fun groupBy(column: Column<*>) {
+    public fun groupBy(column: Column<*>) {
         groupByColumn = column
     }
 
-    fun having(block: ConditionScope.() -> Unit) {
+    public fun having(block: ConditionScope.() -> Unit) {
         val scope = havingScope ?: ConditionScope().also { havingScope = it }
         scope.apply(block)
     }
 
-    fun build(): RoomQlQuery {
+    public fun build(): RoomQlQuery {
         val table = fromTable ?: throw RoomQlException("from() must be called before build()")
         val limit = limitValue
         val entityTable = fromEntityTable
@@ -160,7 +160,7 @@ private fun StringBuilder.appendConditions(
         renderCondition(c, args, this, collidingNames)
     }
 
-fun query(block: QueryBuilder.() -> Unit): RoomQlQuery = QueryBuilder().apply(block).build()
+public fun query(block: QueryBuilder.() -> Unit): RoomQlQuery = QueryBuilder().apply(block).build()
 
 private fun StringBuilder.appendSelectWithAliasing(primary: EntityTable, joins: List<JoinClause>, collidingNames: Set<String>) {
     val allTables = listOf(primary) + joins.map { it.table }

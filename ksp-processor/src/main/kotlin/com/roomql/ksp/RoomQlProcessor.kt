@@ -114,7 +114,7 @@ internal class RoomQlProcessor(private val environment: SymbolProcessorEnvironme
 private fun KSPropertyDeclaration.hasAnnotation(annotationFqn: String): Boolean =
     annotations.any { it.annotationType.resolve().declaration.qualifiedName?.asString() == annotationFqn }
 
-class RoomQlProcessorProvider : SymbolProcessorProvider {
+public class RoomQlProcessorProvider : SymbolProcessorProvider {
     override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor =
         RoomQlProcessor(environment)
 }

@@ -15,4 +15,4 @@ import com.roomql.runtime.RoomQlQuery
  * This bridge lives in the Android-only `:runtime-android` module because
  * [SupportSQLiteQuery] is not available on the plain-JVM `:runtime` classpath.
  */
-fun RoomQlQuery.toQuery(): SupportSQLiteQuery = SimpleSQLiteQuery(sql, args.toTypedArray())
+public fun RoomQlQuery.toQuery(): SupportSQLiteQuery = SimpleSQLiteQuery(sql, args.toTypedArray())

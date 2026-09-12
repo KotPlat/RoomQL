@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.binary.compatibility.validator)
     `maven-publish`
 }
 
@@ -29,6 +30,7 @@ android {
 
 kotlin {
     jvmToolchain(17)
+    explicitApi()
 }
 
 dependencies {
