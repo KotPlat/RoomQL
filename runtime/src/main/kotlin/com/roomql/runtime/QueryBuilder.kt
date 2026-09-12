@@ -1,5 +1,6 @@
 package com.roomql.runtime
 
+@RoomQlDsl
 class QueryBuilder {
     private var fromTable: String? = null
     private var fromTableColumns: TableColumns? = null

@@ -1,5 +1,6 @@
 package com.roomql.runtime
 
+@RoomQlDsl
 class ConditionScope {
     internal val conditions = mutableListOf<Condition>()
 
