@@ -5,6 +5,16 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
+/**
+ * `@RoomQlDsl` (see [RoomQlDsl]) is a compile-time guarantee, not a runtime one, so it can't be
+ * asserted by a test here. Verified manually: pasting
+ * ```
+ * query { from("users"); where { limit(5) } }
+ * ```
+ * into this module fails `:runtime:compileKotlin` with
+ * "'fun limit(n: Int): Unit' cannot be called in this context with an implicit receiver."
+ * Re-check this by hand if `RoomQlDsl` is ever removed from a DSL scope class.
+ */
 class QueryBuilderTest {
 
     // --- from() + bare SELECT ---

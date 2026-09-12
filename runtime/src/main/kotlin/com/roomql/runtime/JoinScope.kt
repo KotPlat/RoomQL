@@ -1,5 +1,6 @@
 package com.roomql.runtime
 
+@RoomQlDsl
 class JoinScope {
     internal var onCondition: Condition = Condition.Empty
 
@@ -8,6 +9,7 @@ class JoinScope {
     }
 }
 
+@RoomQlDsl
 class JoinConditionScope {
     internal val conditions = mutableListOf<Condition>()
 
