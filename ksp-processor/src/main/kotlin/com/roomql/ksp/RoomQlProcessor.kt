@@ -23,10 +23,14 @@ import com.squareup.kotlinpoet.ksp.writeTo
 private const val ENTITY_ANNOTATION = "androidx.room.Entity"
 private const val COLUMN_INFO_ANNOTATION = "androidx.room.ColumnInfo"
 private const val IGNORE_ANNOTATION = "androidx.room.Ignore"
+private const val TABLE_SUFFIX_OPTION = "roomql.tableSuffix"
+private const val DEFAULT_TABLE_SUFFIX = "Table"
 private val COLUMN_CLASS = ClassName("com.roomql.runtime", "Column")
 private val ENTITY_TABLE_CLASS = ClassName("com.roomql.runtime", "EntityTable")
 
-class RoomQlProcessor(private val environment: SymbolProcessorEnvironment) : SymbolProcessor {
+internal class RoomQlProcessor(private val environment: SymbolProcessorEnvironment) : SymbolProcessor {
+    private val tableSuffix = environment.options[TABLE_SUFFIX_OPTION] ?: DEFAULT_TABLE_SUFFIX
+
     override fun process(resolver: Resolver): List<KSAnnotated> {
         val deferred = mutableListOf<KSAnnotated>()
         resolver.getSymbolsWithAnnotation(ENTITY_ANNOTATION)
@@ -41,7 +45,7 @@ class RoomQlProcessor(private val environment: SymbolProcessorEnvironment) : Sym
     private fun generateTableObject(classDecl: KSClassDeclaration) {
         val tableName = extractTableName(classDecl)
         val packageName = classDecl.packageName.asString()
-        val objectName = "${classDecl.simpleName.asString()}Table"
+        val objectName = "${classDecl.simpleName.asString()}$tableSuffix"
 
         val props = classDecl.getAllProperties().filterNot { it.hasAnnotation(IGNORE_ANNOTATION) }.toList()
         val columnNames = props.map { extractColumnName(it) }
@@ -86,20 +90,29 @@ class RoomQlProcessor(private val environment: SymbolProcessorEnvironment) : Sym
         val explicit = findAnnotationArg(prop.annotations, COLUMN_INFO_ANNOTATION, "name")
         return if (explicit.isNullOrEmpty()) prop.simpleName.asString() else explicit
     }
+
+    private fun findAnnotationArg(
+        annotations: Sequence<KSAnnotation>,
+        annotationFqn: String,
+        argName: String,
+    ): String? {
+        val annotation = annotations
+            .firstOrNull { it.annotationType.resolve().declaration.qualifiedName?.asString() == annotationFqn }
+            ?: return null
+        val value = annotation.arguments.firstOrNull { it.name?.asString() == argName }?.value ?: return null
+        if (value !is String) {
+            environment.logger.error(
+                "RoomQL: expected a String for @$annotationFqn's '$argName' but got ${value::class.simpleName}",
+                annotation,
+            )
+            return null
+        }
+        return value
+    }
 }
 
 private fun KSPropertyDeclaration.hasAnnotation(annotationFqn: String): Boolean =
     annotations.any { it.annotationType.resolve().declaration.qualifiedName?.asString() == annotationFqn }
-
-private fun findAnnotationArg(
-    annotations: Sequence<KSAnnotation>,
-    annotationFqn: String,
-    argName: String,
-): String? = annotations
-    .firstOrNull { it.annotationType.resolve().declaration.qualifiedName?.asString() == annotationFqn }
-    ?.arguments
-    ?.firstOrNull { it.name?.asString() == argName }
-    ?.value?.let { it as? String ?: error("Expected String for annotation arg '$argName' but got ${it::class.simpleName}") }
 
 class RoomQlProcessorProvider : SymbolProcessorProvider {
     override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor =
