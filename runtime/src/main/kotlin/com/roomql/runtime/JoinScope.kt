@@ -25,7 +25,7 @@ class JoinConditionScope {
 }
 
 internal data class JoinClause(
-    val table: TableColumns,
+    val table: EntityTable,
     val type: JoinType,
     val onCondition: Condition,
 )

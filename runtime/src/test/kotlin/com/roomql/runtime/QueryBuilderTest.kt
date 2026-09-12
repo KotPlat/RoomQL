@@ -376,7 +376,7 @@ class QueryBuilderTest {
 
     // --- JOIN ---
 
-    private fun tableOf(name: String, vararg cols: String) = object : TableColumns {
+    private fun tableOf(name: String, vararg cols: String) = object : EntityTable {
         override val tableName = name
         override val allColumnNames = cols.toList()
     }

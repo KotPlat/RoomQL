@@ -3,7 +3,7 @@ package com.roomql.runtime
 @RoomQlDsl
 class QueryBuilder {
     private var fromTable: String? = null
-    private var fromTableColumns: TableColumns? = null
+    private var fromEntityTable: EntityTable? = null
     private val joins = mutableListOf<JoinClause>()
     private var whereScope: ConditionScope? = null
     private val orderByClauses = mutableListOf<Pair<Column<*>, SortDirection>>()
@@ -16,12 +16,12 @@ class QueryBuilder {
         fromTable = tableName
     }
 
-    fun from(table: TableColumns) {
-        fromTableColumns = table
+    fun from(table: EntityTable) {
+        fromEntityTable = table
         fromTable = table.tableName
     }
 
-    fun join(table: TableColumns, type: JoinType, block: JoinScope.() -> Unit) {
+    fun join(table: EntityTable, type: JoinType, block: JoinScope.() -> Unit) {
         val scope = JoinScope().apply(block)
         joins.add(JoinClause(table, type, scope.onCondition))
     }
@@ -58,15 +58,15 @@ class QueryBuilder {
         roomQlCheck(limitValue == null || limitValue!! > 0) { "limit() must be a positive integer, got $limitValue" }
         roomQlCheck(offsetValue == null || limitValue != null) { "offset() requires limit() to be set" }
         roomQlCheck(havingScope == null || groupByColumn != null) { "having() requires groupBy() to be set" }
-        roomQlCheck(joins.isEmpty() || fromTableColumns != null) {
-            "join() requires from(TableColumns) so columns can be aliased; from(String) has no column metadata"
+        roomQlCheck(joins.isEmpty() || fromEntityTable != null) {
+            "join() requires from(EntityTable) so columns can be aliased; from(String) has no column metadata"
         }
 
         val collidingNames = collidingColumnNames()
         val args = mutableListOf<Any?>()
         val sql = buildString {
-            if (joins.isNotEmpty() && fromTableColumns != null) {
-                appendSelectWithAliasing(fromTableColumns!!, joins, collidingNames)
+            if (joins.isNotEmpty() && fromEntityTable != null) {
+                appendSelectWithAliasing(fromEntityTable!!, joins, collidingNames)
             } else {
                 append("SELECT *")
             }
@@ -109,7 +109,7 @@ class QueryBuilder {
 
     /** Column names shared by more than one table in this query's FROM + JOINs. Empty when there are no joins. */
     private fun collidingColumnNames(): Set<String> {
-        val primary = fromTableColumns ?: return emptySet()
+        val primary = fromEntityTable ?: return emptySet()
         if (joins.isEmpty()) return emptySet()
         val allTables = listOf(primary) + joins.map { it.table }
         return allTables.flatMap { it.allColumnNames }
@@ -159,7 +159,7 @@ private fun StringBuilder.appendConditions(
 
 fun query(block: QueryBuilder.() -> Unit): RoomQlQuery = QueryBuilder().apply(block).build()
 
-private fun StringBuilder.appendSelectWithAliasing(primary: TableColumns, joins: List<JoinClause>, collidingNames: Set<String>) {
+private fun StringBuilder.appendSelectWithAliasing(primary: EntityTable, joins: List<JoinClause>, collidingNames: Set<String>) {
     val allTables = listOf(primary) + joins.map { it.table }
     append("SELECT ")
     var first = true

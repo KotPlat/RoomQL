@@ -164,10 +164,10 @@ class RoomQlProcessorTest {
         assertTrue(generated.contains("package com.example.data") || generated.contains("package com.example.`data`"))
     }
 
-    // --- generated object implements TableColumns ---
+    // --- generated object implements EntityTable ---
 
     @Test
-    fun `generated object implements TableColumns with tableName and allColumnNames`() {
+    fun `generated object implements EntityTable with tableName and allColumnNames`() {
         val entity = SourceFile.kotlin(
             "ItemEntity.kt", """
             package test
@@ -187,7 +187,7 @@ class RoomQlProcessorTest {
         assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode)
 
         val generated = findGeneratedFile(compilation, "ItemEntityTable.kt").readText()
-        assertTrue("TableColumns" in generated)
+        assertTrue("EntityTable" in generated)
         assertTrue(""""items"""" in generated)
         assertTrue("allColumnNames" in generated)
         assertTrue(""""id"""" in generated)

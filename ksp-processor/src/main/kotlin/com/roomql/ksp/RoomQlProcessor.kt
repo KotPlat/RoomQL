@@ -22,7 +22,7 @@ import com.squareup.kotlinpoet.ksp.writeTo
 private const val ENTITY_ANNOTATION = "androidx.room.Entity"
 private const val COLUMN_INFO_ANNOTATION = "androidx.room.ColumnInfo"
 private val COLUMN_CLASS = ClassName("com.roomql.runtime", "Column")
-private val TABLE_COLUMNS_CLASS = ClassName("com.roomql.runtime", "TableColumns")
+private val ENTITY_TABLE_CLASS = ClassName("com.roomql.runtime", "EntityTable")
 
 class RoomQlProcessor(private val environment: SymbolProcessorEnvironment) : SymbolProcessor {
     override fun process(resolver: Resolver): List<KSAnnotated> {
@@ -45,7 +45,7 @@ class RoomQlProcessor(private val environment: SymbolProcessorEnvironment) : Sym
         val columnNames = props.map { extractColumnName(it) }
 
         val typeSpec = TypeSpec.objectBuilder(objectName)
-            .addSuperinterface(TABLE_COLUMNS_CLASS)
+            .addSuperinterface(ENTITY_TABLE_CLASS)
             .apply {
                 addProperty(
                     PropertySpec.builder("tableName", String::class, KModifier.OVERRIDE)

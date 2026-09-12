@@ -64,7 +64,7 @@ data class UserEntity(
 The KSP processor generates, in the **same package**:
 
 ```kotlin
-object UserEntityTable : TableColumns {
+object UserEntityTable : EntityTable {
     override val tableName = "users"
     override val allColumnNames = listOf("id", "name", "age", "status", "created_at")
     val id: Column<Int>
