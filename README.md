@@ -4,6 +4,8 @@
 
 A type-safe Kotlin DSL for building **dynamic** Room queries at runtime — no raw SQL strings, no reflection, no combinatorial explosion of `@Query` methods.
 
+> **Building dynamic Room queries with optional filters?** If you've fought the `@Query("... WHERE (:minAge IS NULL OR age >= :minAge)")` trick, watched a DAO sprout one method per filter combination (2ⁿ and counting), or had a renamed column break a query *silently at runtime*, RoomQL is for you. It composes Room's `SupportSQLiteQuery` at runtime through a compile-time-safe Kotlin builder — you keep `@RawQuery`, RoomQL builds the SQL.
+
 ---
 
 ## What it is
@@ -34,7 +36,7 @@ Room gives you two ways to write a query with optional runtime filters, and both
 
 Neither scales with the number of optional parameters. RoomQL removes both by building the SQL programmatically, with the column names checked by the compiler.
 
-## What the solution brings
+## What you get
 
 - **Compile-time safety on column references.** `UserEntityTable.age` is generated from your entity. Renames and typos are caught at build time.
 - **Nullable filters that disappear.** A `null` value drops that condition from the SQL — no `if` ladders, no `IS NULL OR` tricks.
@@ -76,7 +78,7 @@ ksp(libs.roomql.ksp.processor)                // generates the *Table objects
 
 ### Requirements
 
-| | |
+| Dependency | Version |
 |---|---|
 | Kotlin | 2.0.x (KSP `2.0.21-1.0.28`) |
 | Room | 2.6.x–2.7.x |
