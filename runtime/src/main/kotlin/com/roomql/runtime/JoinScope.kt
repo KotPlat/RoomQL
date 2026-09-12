@@ -1,19 +1,19 @@
 package com.roomql.runtime
 
 @RoomQlDsl
-class JoinScope {
+public class JoinScope {
     internal var onCondition: Condition = Condition.Empty
 
-    fun on(block: JoinConditionScope.() -> Unit) {
+    public fun on(block: JoinConditionScope.() -> Unit) {
         onCondition = JoinConditionScope().apply(block).build()
     }
 }
 
 @RoomQlDsl
-class JoinConditionScope {
+public class JoinConditionScope {
     internal val conditions = mutableListOf<Condition>()
 
-    infix fun <T> Column<T>.eq(other: Column<T>) {
+    public infix fun <T> Column<T>.eq(other: Column<T>) {
         conditions.add(Condition.ColumnCompare(this, other))
     }
 

@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.binary.compatibility.validator)
     `maven-publish`
 }
 
@@ -8,6 +9,7 @@ version = System.getenv("VERSION") ?: "unspecified"
 
 kotlin {
     jvmToolchain(17)
+    explicitApi()
 }
 
 java {
@@ -24,7 +26,7 @@ dependencies {
     testImplementation(libs.kotlin.compile.testing.ksp)
     testImplementation(libs.room.common)
     testImplementation(project(":runtime"))
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    testRuntimeOnly(libs.junit.platform.launcher)
 }
 
 tasks.test {

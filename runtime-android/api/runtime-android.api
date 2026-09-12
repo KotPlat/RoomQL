@@ -1,0 +1,4 @@
+public final class com/roomql/android/RoomQlQueriesKt {
+	public static final fun toQuery (Lcom/roomql/runtime/RoomQlQuery;)Landroidx/sqlite/db/SupportSQLiteQuery;
+}
+
