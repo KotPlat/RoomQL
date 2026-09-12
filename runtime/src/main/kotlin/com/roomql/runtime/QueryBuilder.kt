@@ -54,19 +54,22 @@ class QueryBuilder {
 
     fun build(): RoomQlQuery {
         val table = fromTable ?: throw RoomQlException("from() must be called before build()")
+        val limit = limitValue
+        val entityTable = fromEntityTable
+        val groupByCol = groupByColumn
 
-        roomQlCheck(limitValue == null || limitValue!! > 0) { "limit() must be a positive integer, got $limitValue" }
-        roomQlCheck(offsetValue == null || limitValue != null) { "offset() requires limit() to be set" }
-        roomQlCheck(havingScope == null || groupByColumn != null) { "having() requires groupBy() to be set" }
-        roomQlCheck(joins.isEmpty() || fromEntityTable != null) {
+        roomQlCheck(limit == null || limit > 0) { "limit() must be a positive integer, got $limit" }
+        roomQlCheck(offsetValue == null || limit != null) { "offset() requires limit() to be set" }
+        roomQlCheck(havingScope == null || groupByCol != null) { "having() requires groupBy() to be set" }
+        roomQlCheck(joins.isEmpty() || entityTable != null) {
             "join() requires from(EntityTable) so columns can be aliased; from(String) has no column metadata"
         }
 
         val collidingNames = collidingColumnNames()
         val args = mutableListOf<Any?>()
         val sql = buildString {
-            if (joins.isNotEmpty() && fromEntityTable != null) {
-                appendSelectWithAliasing(fromEntityTable!!, joins, collidingNames)
+            if (joins.isNotEmpty() && entityTable != null) {
+                appendSelectWithAliasing(entityTable, joins, collidingNames)
             } else {
                 append("SELECT *")
             }
@@ -86,8 +89,8 @@ class QueryBuilder {
                 renderCondition(whereCondition, args, this, collidingNames)
             }
 
-            if (groupByColumn != null) {
-                append(" GROUP BY ${groupByColumn!!.render(collidingNames)}")
+            if (groupByCol != null) {
+                append(" GROUP BY ${groupByCol.render(collidingNames)}")
                 val havingCondition = havingScope?.build() ?: Condition.Empty
                 if (havingCondition !is Condition.Empty) {
                     append(" HAVING ")
@@ -97,10 +100,10 @@ class QueryBuilder {
 
             if (orderByClauses.isNotEmpty()) {
                 append(" ORDER BY ")
-                append(orderByClauses.joinToString(", ") { (col, dir) -> "${col.render(collidingNames)} $dir" })
+                append(orderByClauses.joinToString(", ") { (col, dir) -> "${col.render(collidingNames)} ${dir.keyword}" })
             }
 
-            limitValue?.let { append(" LIMIT $it") }
+            limit?.let { append(" LIMIT $it") }
             offsetValue?.let { append(" OFFSET $it") }
         }
 

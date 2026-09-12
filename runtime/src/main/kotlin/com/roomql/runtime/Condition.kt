@@ -12,3 +12,10 @@ internal sealed class Condition {
     data class And(val conditions: List<Condition>) : Condition()
     data class Or(val conditions: List<Condition>) : Condition()
 }
+
+/** Collapses a scope's accumulated conditions into a single AND-combined [Condition]. */
+internal fun List<Condition>.toCondition(): Condition = when {
+    isEmpty() -> Condition.Empty
+    size == 1 -> first()
+    else -> Condition.And(this)
+}

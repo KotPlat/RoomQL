@@ -17,11 +17,7 @@ class JoinConditionScope {
         conditions.add(Condition.ColumnCompare(this, other))
     }
 
-    internal fun build(): Condition = when {
-        conditions.isEmpty() -> Condition.Empty
-        conditions.size == 1 -> conditions.first()
-        else -> Condition.And(conditions)
-    }
+    internal fun build(): Condition = conditions.toCondition()
 }
 
 internal data class JoinClause(

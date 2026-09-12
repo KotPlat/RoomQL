@@ -13,11 +13,7 @@ class ConditionScope {
         if (scope.conditions.isNotEmpty()) add(Condition.Or(scope.conditions))
     }
 
-    internal fun build(): Condition = when {
-        conditions.isEmpty() -> Condition.Empty
-        conditions.size == 1 -> conditions.first()
-        else -> Condition.And(conditions)
-    }
+    internal fun build(): Condition = conditions.toCondition()
 
     // ---- Operators as extension functions so they auto-register inside this scope ----
 
