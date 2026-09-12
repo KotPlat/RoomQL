@@ -100,7 +100,7 @@ class QueryBuilder {
             offsetValue?.let { append(" OFFSET $it") }
         }
 
-        return RoomQlQuery(sql, args.toTypedArray())
+        return RoomQlQuery(sql, args)
     }
 
     /** Column names shared by more than one table in this query's FROM + JOINs. Empty when there are no joins. */
