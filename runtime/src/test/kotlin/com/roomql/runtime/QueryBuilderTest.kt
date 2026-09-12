@@ -489,6 +489,72 @@ class QueryBuilderTest {
         assertEquals(listOf("active"), result.args.toList())
     }
 
+    @Test
+    fun `where on a colliding column name is qualified when joined`() {
+        val users = tableOf("users", "id", "name", "status")
+        val orders = tableOf("orders", "id", "user_id", "status")
+        val result = query {
+            from(users)
+            join(orders, JoinType.INNER) {
+                on { Column<Long>("id", "users") eq Column<Long>("user_id", "orders") }
+            }
+            where { Column<String>("status", "orders") eq "active" }
+        }
+        assertEquals(
+            "SELECT users.id AS users__id, name, users.status AS users__status," +
+                " orders.id AS orders__id, user_id, orders.status AS orders__status" +
+                " FROM users INNER JOIN orders ON users.id = orders.user_id" +
+                " WHERE orders.status = ?",
+            result.sql
+        )
+        assertEquals(listOf("active"), result.args.toList())
+    }
+
+    @Test
+    fun `groupBy and orderBy on a colliding column name are qualified when joined`() {
+        val users = tableOf("users", "id", "name")
+        val orders = tableOf("orders", "id", "user_id")
+        val result = query {
+            from(users)
+            join(orders, JoinType.INNER) {
+                on { Column<Long>("id", "users") eq Column<Long>("user_id", "orders") }
+            }
+            groupBy(Column<Long>("id", "users"))
+            orderBy(Column<Long>("id", "orders"), SortDirection.ASC)
+        }
+        assertTrue("GROUP BY users.id" in result.sql)
+        assertTrue("ORDER BY orders.id ASC" in result.sql)
+    }
+
+    @Test
+    fun `having on a colliding column name is qualified when joined`() {
+        val users = tableOf("users", "id", "name")
+        val orders = tableOf("orders", "id", "user_id")
+        val result = query {
+            from(users)
+            join(orders, JoinType.INNER) {
+                on { Column<Long>("id", "users") eq Column<Long>("user_id", "orders") }
+            }
+            groupBy(Column<Long>("id", "users"))
+            having { Column<Long>("id", "orders") gt 5L }
+        }
+        assertTrue("HAVING orders.id > ?" in result.sql)
+    }
+
+    @Test
+    fun `non-colliding columns stay unqualified when joined`() {
+        val users = tableOf("users", "id", "name")
+        val orders = tableOf("orders", "order_id", "user_id", "amount")
+        val result = query {
+            from(users)
+            join(orders, JoinType.INNER) {
+                on { Column<Long>("id", "users") eq Column<Long>("user_id", "orders") }
+            }
+            where { Column<Double>("amount", "orders") gt 100.0 }
+        }
+        assertTrue("WHERE amount > ?" in result.sql)
+    }
+
     // --- Full query combining multiple clauses ---
 
     @Test
