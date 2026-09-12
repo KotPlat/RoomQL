@@ -32,13 +32,13 @@ class RoomQlProcessor(private val environment: SymbolProcessorEnvironment) : Sym
         resolver.getSymbolsWithAnnotation(ENTITY_ANNOTATION)
             .filterIsInstance<KSClassDeclaration>()
             .forEach { classDecl ->
-                if (classDecl.validate()) generateColumnsObject(classDecl)
+                if (classDecl.validate()) generateTableObject(classDecl)
                 else deferred.add(classDecl)
             }
         return deferred
     }
 
-    private fun generateColumnsObject(classDecl: KSClassDeclaration) {
+    private fun generateTableObject(classDecl: KSClassDeclaration) {
         val tableName = extractTableName(classDecl)
         val packageName = classDecl.packageName.asString()
         val objectName = "${classDecl.simpleName.asString()}Table"

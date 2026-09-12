@@ -35,7 +35,7 @@ class RoomQlProcessorTest {
     // --- basic entity with explicit tableName ---
 
     @Test
-    fun `generates columns object with explicit tableName`() {
+    fun `generates table object with explicit tableName`() {
         val entity = SourceFile.kotlin(
             "UserEntity.kt", """
             package test
@@ -64,7 +64,7 @@ class RoomQlProcessorTest {
     // --- entity with default tableName (uses class name) ---
 
     @Test
-    fun `generates columns object using class name as default tableName`() {
+    fun `generates table object using class name as default tableName`() {
         val entity = SourceFile.kotlin(
             "ProductEntity.kt", """
             package test

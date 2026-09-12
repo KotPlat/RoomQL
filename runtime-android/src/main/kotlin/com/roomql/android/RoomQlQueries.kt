@@ -9,7 +9,7 @@ import com.roomql.runtime.RoomQlQuery
  * [SupportSQLiteQuery] that Room's `@RawQuery` methods accept.
  *
  * ```
- * dao.search(query { from(UserEntityColumns); where { ... } }.toQuery())
+ * dao.search(query { from(UserEntityTable); where { ... } }.toQuery())
  * ```
  *
  * This bridge lives in the Android-only `:runtime-android` module because
