@@ -6,6 +6,7 @@ import com.tschuchort.compiletesting.JvmCompilationResult
 import com.tschuchort.compiletesting.KotlinCompilation
 import com.tschuchort.compiletesting.SourceFile
 import com.tschuchort.compiletesting.configureKsp
+import com.tschuchort.compiletesting.kspProcessorOptions
 import com.tschuchort.compiletesting.kspSourcesDir
 import org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi
 import java.io.File
@@ -15,12 +16,16 @@ import kotlin.test.assertTrue
 
 class RoomQlProcessorTest {
 
-    private fun compile(vararg sources: SourceFile): Pair<JvmCompilationResult, KotlinCompilation> {
+    private fun compile(
+        vararg sources: SourceFile,
+        processorOptions: Map<String, String> = emptyMap(),
+    ): Pair<JvmCompilationResult, KotlinCompilation> {
         val compilation = KotlinCompilation().apply {
             this.sources = sources.toList()
             configureKsp(useKsp2 = true) {
                 symbolProcessorProviders += RoomQlProcessorProvider()
             }
+            kspProcessorOptions.putAll(processorOptions)
             inheritClassPath = true
             messageOutputStream = System.out
         }
@@ -162,6 +167,26 @@ class RoomQlProcessorTest {
 
         val generated = findGeneratedFile(compilation, "RoomEntityTable.kt").readText()
         assertTrue(generated.contains("package com.example.data") || generated.contains("package com.example.`data`"))
+    }
+
+    // --- configurable *Table suffix ---
+
+    @Test
+    fun `roomql tableSuffix option overrides the generated object name suffix`() {
+        val entity = SourceFile.kotlin(
+            "UserEntity.kt", """
+            package test
+            import androidx.room.Entity
+
+            @Entity(tableName = "users")
+            data class UserEntity(val id: Int)
+        """
+        )
+
+        val (result, compilation) = compile(entity, processorOptions = mapOf("roomql.tableSuffix" to "Cols"))
+
+        assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode)
+        findGeneratedFile(compilation, "UserEntityCols.kt")
     }
 
     // --- @Ignore ---
