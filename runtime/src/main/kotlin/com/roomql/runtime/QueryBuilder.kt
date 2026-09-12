@@ -58,6 +58,9 @@ class QueryBuilder {
         roomQlCheck(limitValue == null || limitValue!! > 0) { "limit() must be a positive integer, got $limitValue" }
         roomQlCheck(offsetValue == null || limitValue != null) { "offset() requires limit() to be set" }
         roomQlCheck(havingScope == null || groupByColumn != null) { "having() requires groupBy() to be set" }
+        roomQlCheck(joins.isEmpty() || fromTableColumns != null) {
+            "join() requires from(TableColumns) so columns can be aliased; from(String) has no column metadata"
+        }
 
         val collidingNames = collidingColumnNames()
         val args = mutableListOf<Any?>()

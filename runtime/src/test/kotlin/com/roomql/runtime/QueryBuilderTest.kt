@@ -468,15 +468,15 @@ class QueryBuilderTest {
     }
 
     @Test
-    fun `join without column info falls back to SELECT star`() {
-        val result = query {
-            from("users")
-            join(tableOf("orders", "id", "user_id"), JoinType.INNER) {
-                on { Column<Long>("id", "users") eq Column<Long>("user_id", "orders") }
+    fun `join with a raw string from throws instead of silently dropping aliasing`() {
+        assertFailsWith<RoomQlException> {
+            query {
+                from("users")
+                join(tableOf("orders", "id", "user_id"), JoinType.INNER) {
+                    on { Column<Long>("id", "users") eq Column<Long>("user_id", "orders") }
+                }
             }
         }
-        assertTrue(result.sql.startsWith("SELECT * FROM users"))
-        assertTrue("INNER JOIN orders ON" in result.sql)
     }
 
     @Test
