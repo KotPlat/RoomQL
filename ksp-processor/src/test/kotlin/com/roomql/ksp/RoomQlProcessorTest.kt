@@ -164,6 +164,37 @@ class RoomQlProcessorTest {
         assertTrue(generated.contains("package com.example.data") || generated.contains("package com.example.`data`"))
     }
 
+    // --- @Ignore ---
+
+    @Test
+    fun `Ignore'd properties are excluded from the generated columns and allColumnNames`() {
+        val entity = SourceFile.kotlin(
+            "UserEntity.kt", """
+            package test
+            import androidx.room.Entity
+            import androidx.room.Ignore
+
+            @Entity(tableName = "users")
+            data class UserEntity(
+                val id: Int,
+                val name: String,
+                @Ignore val fullNameCache: String = ""
+            )
+        """
+        )
+
+        val (result, compilation) = compile(entity)
+
+        assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode)
+
+        val generated = findGeneratedFile(compilation, "UserEntityTable.kt").readText()
+        assertTrue("val id" in generated)
+        assertTrue("val name" in generated)
+        assertTrue("fullNameCache" !in generated)
+        assertTrue(""""id"""" in generated)
+        assertTrue(""""name"""" in generated)
+    }
+
     // --- generated object implements EntityTable ---
 
     @Test
