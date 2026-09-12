@@ -532,7 +532,7 @@ fun `null status is omitted`() {
         }
     }
     assertEquals("SELECT * FROM users WHERE age >= ?", q.sql)
-    assertContentEquals(arrayOf(18), q.args)
+    assertEquals(listOf(18), q.args)
 }
 ```
 
