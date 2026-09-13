@@ -37,6 +37,20 @@ jobs:
       - name: Check public API surface
         run: ./gradlew apiCheck
 
+      # The demo is a standalone Gradle build consuming RoomQL as published artifacts.
+      # Publishing locally first means CI verifies the documented install path, not just
+      # that the code compiles.
+      # Published under the exact version demo/gradle/libs.versions.toml asks for, so
+      # mavenLocal() satisfies it. Keep the two in step if the demo's roomql version moves.
+      - name: Publish library to Maven local
+        run: VERSION=1.0.0 ./gradlew publishToMavenLocal
+
+      - name: Build demo app
+        run: ./gradlew -p demo assembleDebug
+
+      - name: Test demo app
+        run: ./gradlew -p demo testDebugUnitTest
+
       - name: Upload test reports
         if: failure()
         uses: actions/upload-artifact@v7
