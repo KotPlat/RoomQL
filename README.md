@@ -14,6 +14,16 @@
   <a href="https://developer.android.com"><img src="https://img.shields.io/badge/minSdk-21%2B-3DDC84?logo=android&logoColor=white" alt="minSdk 21+"/></a>
 </p>
 
+<p align="center">
+  <a href="#installation"><b>Install</b></a> &nbsp;·&nbsp;
+  <a href="#minimal-working-example"><b>Quick start</b></a> &nbsp;·&nbsp;
+  <a href="docs/USAGE.md"><b>Usage guide</b></a> &nbsp;·&nbsp;
+  <a href="#api-reference"><b>API reference</b></a> &nbsp;·&nbsp;
+  <a href="#how-roomql-compares-to-the-alternatives"><b>Comparison</b></a> &nbsp;·&nbsp;
+  <a href="#faq"><b>FAQ</b></a> &nbsp;·&nbsp;
+  <a href="CHANGELOG.md"><b>Changelog</b></a>
+</p>
+
 ---
 
 Room has no good answer for a query whose filters are decided at runtime. Write it as a `@Query` string and you end up with `WHERE (:minAge IS NULL OR age >= :minAge)` repeated per filter, with column names the compiler never checks — rename a column and the query breaks *silently at runtime*. Write it as overloaded DAO methods and you need one method per filter combination, heading toward 2ⁿ. **RoomQL** builds the SQL programmatically instead: you keep Room's `@RawQuery`, a KSP processor generates a typed `Column<T>` for every column in your `@Entity` classes, and a `null` filter simply drops out of the generated SQL.

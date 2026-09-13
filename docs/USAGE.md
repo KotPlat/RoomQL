@@ -1,37 +1,40 @@
-# RoomQL — Usage Guide
+# RoomQL Usage Guide — building dynamic Android Room queries in Kotlin
 
-A detailed, example-driven walkthrough of the RoomQL DSL. For the high-level pitch, installation, and pitfalls see the [main README](../README.md). This guide assumes you've added the three dependencies (`roomql-runtime`, `roomql-runtime-android`, `roomql-ksp-processor`).
+Every operator in the **RoomQL 1.0.0** DSL, the SQL each one generates, and the idioms for joins, `Flow`, error handling, and testing. For the pitch, installation, API reference, and limitations, see the [main README](../README.md).
+
+RoomQL is a type-safe Kotlin DSL that builds a Room `@RawQuery` at runtime, so a search screen whose filters are chosen by the user needs neither `(:minAge IS NULL OR age >= :minAge)` string tricks nor one DAO method per filter combination. This guide assumes you have added the three artifacts — `roomql-runtime`, `roomql-runtime-android`, and `roomql-ksp-processor` — as shown in the [installation section](../README.md#installation).
 
 Every example shows the **Kotlin** you write and the **SQL** RoomQL generates, so you can see exactly what reaches SQLite.
 
 ---
 
-## Table of contents
+## Contents
 
-1. [The mental model](#1-the-mental-model)
-2. [Define entities](#2-define-entities)
-3. [Wire up the DAO and database](#3-wire-up-the-dao-and-database)
-4. [Your first query](#4-your-first-query)
-5. [WHERE, AND, OR](#5-where-and-or)
-6. [Nullable filters (the killer feature)](#6-nullable-filters-the-killer-feature)
-7. [All operators](#7-all-operators)
-8. [Ordering and pagination](#8-ordering-and-pagination)
-9. [Grouping and aggregates](#9-grouping-and-aggregates)
-10. [JOINs](#10-joins)
-11. [Suspend and Flow](#11-suspend-and-flow)
-12. [The `.toQuery()` bridge](#12-the-toquery-bridge)
-13. [Error handling](#13-error-handling)
-14. [A complete repository](#14-a-complete-repository)
-15. [Testing your queries](#15-testing-your-queries)
+1. [How RoomQL works: the three moving parts](#how-roomql-works-the-three-moving-parts)
+2. [Defining Room entities for RoomQL](#defining-room-entities-for-roomql)
+3. [Declaring the @RawQuery DAO and database](#declaring-the-rawquery-dao-and-database)
+4. [Your first dynamic query](#your-first-dynamic-query)
+5. [Combining conditions with AND and OR](#combining-conditions-with-and-and-or)
+6. [Optional filters: how null values drop out of the SQL](#optional-filters-how-null-values-drop-out-of-the-sql)
+7. [Operator reference: every condition RoomQL generates](#operator-reference-every-condition-roomql-generates)
+8. [Sorting and paginating with ORDER BY, LIMIT, and OFFSET](#sorting-and-paginating-with-order-by-limit-and-offset)
+9. [Grouping rows with GROUP BY and HAVING](#grouping-rows-with-group-by-and-having)
+10. [Joining tables with INNER JOIN and LEFT JOIN](#joining-tables-with-inner-join-and-left-join)
+11. [Returning suspend and Flow results](#returning-suspend-and-flow-results)
+12. [Converting a RoomQlQuery with .toQuery()](#converting-a-roomqlquery-with-toquery)
+13. [Error handling: what build() rejects and why](#error-handling-what-build-rejects-and-why)
+14. [A complete repository](#a-complete-repository)
+15. [Testing generated SQL without a device](#testing-generated-sql-without-a-device)
+16. [Troubleshooting](#troubleshooting)
 
 ---
 
-## 1. The mental model
+## How RoomQL works: the three moving parts
 
-RoomQL has exactly three moving parts:
+RoomQL has exactly three pieces, one per published artifact:
 
-1. **Generated column refs.** For each `@Entity`, the KSP processor generates an `object <EntityName>Table` holding a typed `Column<T>` for every column.
-2. **The `query { }` builder.** A pure-Kotlin DSL that turns those refs into a `RoomQlQuery` (a SQL string + positional args). No Android involved — it's unit-testable on the JVM.
+1. **Generated column references.** For each Room `@Entity`, the KSP processor generates an `object <EntityName>Table` holding a typed `Column<T>` for every column.
+2. **The `query { }` builder.** A pure-Kotlin DSL that turns those references into a `RoomQlQuery` — a SQL string plus positional args. No Android involved, so it is unit-testable on the JVM.
 3. **The `.toQuery()` bridge.** Adapts a `RoomQlQuery` into the `SupportSQLiteQuery` that Room's `@RawQuery` methods accept.
 
 ```
@@ -42,9 +45,9 @@ You always write Room's `@RawQuery` methods yourself — RoomQL never generates 
 
 ---
 
-## 2. Define entities
+## Defining Room entities for RoomQL
 
-Annotate entities exactly as you would for Room. Nothing RoomQL-specific here.
+Annotate entities exactly as you would for Room; there is nothing RoomQL-specific to add. The RoomQL KSP processor reads the `@Entity` classes you already have and generates the column references from them.
 
 ```kotlin
 import androidx.room.ColumnInfo
@@ -61,30 +64,42 @@ data class UserEntity(
 )
 ```
 
-The KSP processor generates, in the **same package**:
+The processor generates, in the **same package**:
 
 ```kotlin
 object UserEntityTable : EntityTable {
     override val tableName = "users"
     override val allColumnNames = listOf("id", "name", "age", "status", "created_at")
-    val id: Column<Int>
-    val name: Column<String>
-    val age: Column<Int>
-    val status: Column<String>
-    val createdAt: Column<Long>   // ← uses the @ColumnInfo name "created_at" in SQL
+    val id: Column<Int> = Column("id", "users")
+    val name: Column<String> = Column("name", "users")
+    val age: Column<Int> = Column("age", "users")
+    val status: Column<String> = Column("status", "users")
+    val createdAt: Column<Long> = Column("created_at", "users")
 }
 ```
 
-Notes:
-- `@Entity(tableName = "...")` → the object's `tableName`. Without it, the class name is used.
-- `@ColumnInfo(name = "...")` → the column's SQL name. The Kotlin property keeps its name (`createdAt`), but the generated SQL uses `created_at`.
-- Nullable properties produce nullable `Column<T?>`.
+How entity annotations map to the generated object:
+
+| In your entity | Effect on the generated `*Table` |
+|---|---|
+| `@Entity(tableName = "users")` | becomes `tableName`. Without it, the class name is used. |
+| `@ColumnInfo(name = "created_at")` | the property keeps its Kotlin name (`createdAt`); the SQL uses `created_at`. |
+| A nullable property (`val email: String?`) | produces a nullable `Column<String?>`. |
+| `@Ignore` on a property | skipped entirely — it is not a column. |
+
+The generated object's name is the entity class name plus a suffix, `Table` by default. Change it with the `roomql.tableSuffix` KSP option if that collides with a name you already use:
+
+```kotlin
+ksp {
+    arg("roomql.tableSuffix", "Columns")   // generates UserEntityColumns instead
+}
+```
 
 ---
 
-## 3. Wire up the DAO and database
+## Declaring the @RawQuery DAO and database
 
-RoomQL uses Room's `@RawQuery`. You own these declarations.
+RoomQL builds the query but never the DAO, so you declare `@RawQuery` methods yourself and keep full control of the return types. A method that returns `Flow` additionally needs `observedEntities`, because Room cannot inspect a raw query to learn which tables it reads.
 
 ```kotlin
 import androidx.room.*
@@ -112,11 +127,11 @@ abstract class AppDatabase : RoomDatabase() {
 }
 ```
 
-> **Why `observedEntities` on the Flow method?** Room can't inspect a raw query to learn which tables it reads, so for a `Flow` you must tell it which entities to watch for changes. See [pitfalls](../README.md#pitfalls--limitations).
+Omit an entity from `observedEntities` and the `Flow` will not re-emit when that table changes. This is a Room requirement, not a RoomQL one — see [Troubleshooting](#why-doesnt-my-flow-re-emit-when-the-table-changes).
 
 ---
 
-## 4. Your first query
+## Your first dynamic query
 
 ```kotlin
 import com.roomql.runtime.query
@@ -137,13 +152,13 @@ SELECT * FROM users WHERE age >= ?
 -- args: [18]
 ```
 
-Arguments are **always** bound as positional `?` placeholders — never string-interpolated — so there's no SQL-injection surface.
+Values are **always** bound as positional `?` placeholders and passed to SQLite as an argument list — RoomQL never interpolates a value into the SQL text, so there is no injection surface.
 
 ---
 
-## 5. WHERE, AND, OR
+## Combining conditions with AND and OR
 
-Conditions inside a single `where { }` are combined with **AND** by default:
+Conditions inside a single `where { }` block are combined with **AND**:
 
 ```kotlin
 query {
@@ -160,7 +175,7 @@ SELECT * FROM users WHERE age >= ? AND status = ?
 -- args: [18, "active"]
 ```
 
-Use `or { }` to group alternatives. The OR-group is wrapped in parentheses and combined with the surrounding ANDs:
+Use `or { }` to group alternatives. RoomQL wraps the OR-group in parentheses and combines it with the surrounding ANDs:
 
 ```kotlin
 query {
@@ -180,7 +195,7 @@ SELECT * FROM users WHERE status = ? AND (age < ? OR age > ?)
 -- args: ["active", 18, 65]
 ```
 
-Multiple `where { }` calls on the same builder merge into one AND-combined set — so you can add conditions conditionally:
+Calling `where { }` more than once on the same builder merges the blocks into one AND-combined set, which lets you add conditions from ordinary Kotlin control flow:
 
 ```kotlin
 query {
@@ -192,11 +207,13 @@ query {
 }
 ```
 
+An `or { }` block whose conditions all skip contributes nothing — no empty `()` reaches the SQL.
+
 ---
 
-## 6. Nullable filters (the killer feature)
+## Optional filters: how null values drop out of the SQL
 
-Any operator that takes a value **skips itself when the value is `null`**. This is what removes the `if (x != null)` ladders you'd write with raw SQL.
+This is the feature RoomQL exists for. Every RoomQL operator that takes a value accepts a **nullable** one, and emits nothing at all when that value is `null` — so a filter the user left blank is simply absent from the generated SQL, with no `if` ladder and no `(:minAge IS NULL OR age >= :minAge)` trick.
 
 ```kotlin
 fun searchUsers(minAge: Int?, status: String?) = query {
@@ -208,6 +225,8 @@ fun searchUsers(minAge: Int?, status: String?) = query {
 }
 ```
 
+One function, four different queries:
+
 | Call | Generated SQL | args |
 |---|---|---|
 | `searchUsers(18, "active")` | `SELECT * FROM users WHERE age >= ? AND status = ?` | `[18, "active"]` |
@@ -215,13 +234,13 @@ fun searchUsers(minAge: Int?, status: String?) = query {
 | `searchUsers(null, "active")` | `SELECT * FROM users WHERE status = ?` | `["active"]` |
 | `searchUsers(null, null)` | `SELECT * FROM users` | `[]` |
 
-> ⚠️ **`null` means "skip this condition", not "match NULL".** If you want `WHERE status IS NULL`, use `isNull()` (below) — that operator never skips.
+> ⚠️ **`null` means "skip this condition", not "match NULL".** Passing `null` widens the result set rather than narrowing it. To match SQL `NULL`, use `isNull()`, which never skips.
 
 ---
 
-## 7. All operators
+## Operator reference: every condition RoomQL generates
 
-Available inside `where { }` and `having { }`:
+These operators are available inside `where { }` and `having { }`. Each one takes a nullable value and skips itself when that value is `null`, except `isNull` and `isNotNull`, which never skip.
 
 ### Comparisons
 
@@ -234,7 +253,9 @@ UserEntityTable.age lt 65          // age < ?
 UserEntityTable.age lte 65         // age <= ?
 ```
 
-### Text matching (you supply the SQL `LIKE` pattern)
+### Text matching
+
+`like` and `notLike` take the SQL pattern verbatim, so you place the wildcards. `contains` writes them for you. All three are restricted to `String` columns, so they cannot be applied to a numeric column by mistake.
 
 ```kotlin
 UserEntityTable.name like "A%"        // name LIKE ?         args: ["A%"]
@@ -252,7 +273,7 @@ UserEntityTable.status notInList listOf("banned")
 // status NOT IN (?)  args: ["banned"]
 ```
 
-`inList` / `notInList` skip when the list is `null` **or empty**.
+`inList` and `notInList` skip when the list is `null` **or empty** — an empty list means "no filter", never "match nothing".
 
 ### Ranges
 
@@ -261,9 +282,9 @@ UserEntityTable.age.between(18, 65)     // age BETWEEN ? AND ?   args: [18, 65]
 UserEntityTable.age.between(18, null)   // skipped: upper bound is null
 ```
 
-`between` skips if **either** bound is `null`.
+`between` skips if **either** bound is `null`. For an open-ended range, use `gte` or `lte` alone — each skips independently.
 
-### Null checks (never skipped)
+### Null checks
 
 ```kotlin
 UserEntityTable.status.isNull()      // status IS NULL
@@ -282,7 +303,9 @@ UserEntityTable.status.isNotNull()   // status IS NOT NULL
 
 ---
 
-## 8. Ordering and pagination
+## Sorting and paginating with ORDER BY, LIMIT, and OFFSET
+
+Call `orderBy` once per sort key — repeated calls build a multi-column `ORDER BY` in the order you wrote them.
 
 ```kotlin
 import com.roomql.runtime.SortDirection
@@ -300,13 +323,14 @@ query {
 SELECT * FROM users ORDER BY age DESC, name ASC LIMIT 20 OFFSET 40
 ```
 
-Rules (enforced at `build()`):
+Two rules, both enforced when the query is built:
+
 - `limit(n)` must be **positive**.
-- `offset(n)` requires a `limit` to be set.
+- `offset(n)` requires a `limit` to be set — a SQLite restriction, not a RoomQL one.
 
 ---
 
-## 9. Grouping and aggregates
+## Grouping rows with GROUP BY and HAVING
 
 ```kotlin
 query {
@@ -321,15 +345,13 @@ SELECT * FROM orders GROUP BY userId HAVING total > ?
 -- args: [100.0]
 ```
 
-Rules:
-- `having { }` requires `groupBy(...)` to be set, or `build()` throws.
-- `having { }` accepts the same operators as `where { }`.
+`having { }` accepts exactly the same operators as `where { }`, including null-skipping, and requires `groupBy(...)` to be set or `build()` throws. RoomQL 1.0.0 groups by a **single** column and selects whole rows: there are no aggregate expressions (`COUNT`, `SUM`) and no multi-column `GROUP BY`. For those, a static Room `@Query` remains the right tool.
 
 ---
 
-## 10. JOINs
+## Joining tables with INNER JOIN and LEFT JOIN
 
-Join with `join(table, type) { on { ... } }`. Use `JoinType.INNER` or `JoinType.LEFT`. Chain multiple `join` calls for more than two tables.
+Join with `join(table, type) { on { ... } }`, using `JoinType.INNER` or `JoinType.LEFT`. Chain multiple `join` calls for more than two tables.
 
 ```kotlin
 import com.roomql.runtime.JoinType
@@ -350,9 +372,9 @@ val q = query {
 }
 ```
 
-### Automatic column aliasing
+### How RoomQL aliases colliding join columns
 
-`users` and `orders` both have an `id` and a `status`. To stop a raw cursor from silently overwriting one with the other, RoomQL aliases **colliding** columns as `table__column` (unique columns are left bare):
+`users` and `orders` both have an `id` and a `status`. To stop a raw cursor from silently overwriting one with the other, RoomQL aliases the **colliding** columns as `table__column` and leaves unique ones bare:
 
 ```sql
 SELECT users.id AS users__id, name, age, users.status AS users__status,
@@ -360,17 +382,17 @@ SELECT users.id AS users__id, name, age, users.status AS users__status,
 FROM users INNER JOIN orders ON users.id = orders.userId
 ```
 
-> Aliasing only happens when the primary table is a generated `*Table` (`from(UserEntityTable)`). With the raw-string overload `from("users")` there is no column metadata, so combining it with `join(...)` throws `RoomQlException` at `build()` rather than silently emitting an unaliased `SELECT *`.
+The same collision detection qualifies references in `where { }`, `having { }`, `groupBy(...)`, and `orderBy(...)` with `table.column` whenever the column name collides — a unique name stays bare. On the query above, `where { OrderEntityTable.status eq "paid" }` renders `WHERE orders.status = ?`, not the ambiguous `WHERE status = ?`.
 
-The same collision detection qualifies `where { }`, `having { }`, `groupBy(...)`, and `orderBy(...)` with `table.column` whenever the referenced column's name collides across the joined tables — a unique column name stays bare. `where { OrderEntityTable.status eq "paid" }` on the query above renders `WHERE orders.status = ?`, not the ambiguous `WHERE status = ?`.
+> Aliasing needs column metadata, so it only happens when the primary table is a generated `*Table` (`from(UserEntityTable)`). The raw-string overload `from("users")` carries none, so combining it with `join(...)` throws `RoomQlException` at `build()` rather than silently emitting an unaliased `SELECT *`.
 
-### Mapping JOIN results
+### Mapping JOIN results to a data class
 
-You provide your own result class. Map colliding columns with `@ColumnInfo(name = "table__column")`; unique columns map by their bare name:
+RoomQL does not generate result types — you supply your own, which is what lets you control its shape. Map colliding columns with `@ColumnInfo(name = "table__column")`; unique columns map by their bare name.
 
 ```kotlin
 data class UserOrder(
-    @ColumnInfo(name = "name")       val userName: String,   // unique → bare
+    @ColumnInfo(name = "name")       val userName: String,    // unique → bare
     @ColumnInfo(name = "total")      val orderTotal: Double,  // unique → bare
     @ColumnInfo(name = "users__id")  val userId: Int,         // collided → aliased
     @ColumnInfo(name = "orders__id") val orderId: Int,        // collided → aliased
@@ -385,9 +407,9 @@ interface OrderDao {
 
 ---
 
-## 11. Suspend and Flow
+## Returning suspend and Flow results
 
-The DSL is identical; only your DAO method's return type changes.
+A RoomQL query is the same in all three cases — blocking, `suspend`, and `Flow` are decided entirely by the DAO method's return type, because `.toQuery()` produces an ordinary `SupportSQLiteQuery` that Room treats like any other.
 
 **One-shot (suspend):**
 
@@ -413,13 +435,13 @@ fun observeAdults(): Flow<List<UserEntity>> {
 }
 ```
 
-The `Flow` re-emits on every change to the tables listed in `@RawQuery(observedEntities = [...])`. Forget to list a table and the flow won't react to it.
+The `Flow` re-emits on every change to the tables listed in `@RawQuery(observedEntities = [...])`. A table missing from that list is a table the `Flow` will not react to.
 
 ---
 
-## 12. The `.toQuery()` bridge
+## Converting a RoomQlQuery with .toQuery()
 
-`query { }` returns a `RoomQlQuery` (pure JVM). Room's `@RawQuery` wants a `SupportSQLiteQuery`. `.toQuery()` (from `com.roomql.android`) bridges them:
+`query { }` returns a `RoomQlQuery`, a pure-JVM value holding `sql` and `args`; Room's `@RawQuery` wants a `SupportSQLiteQuery`. The `.toQuery()` extension from `com.roomql.android` converts one to the other, and is the single point where RoomQL touches Android.
 
 ```kotlin
 import com.roomql.android.toQuery
@@ -428,13 +450,13 @@ val rql = query { from(UserEntityTable) }   // RoomQlQuery — inspect .sql / .a
 val support = rql.toQuery()                 // SupportSQLiteQuery — pass to the DAO
 ```
 
-Keeping the two types separate is deliberate: it lets you unit-test the exact SQL and args (`rql.sql`, `rql.args`) on the JVM without a device, and only cross into Android at the DAO boundary.
+Keeping the two types apart is deliberate: it lets you assert on the exact SQL and args on the JVM with no device, and cross into Android only at the DAO boundary.
 
 ---
 
-## 13. Error handling
+## Error handling: what build() rejects and why
 
-All validation is deferred to `build()` (which `query { }` calls for you) and throws `RoomQlException : RuntimeException`:
+RoomQL defers all validation to `build()` — which `query { }` calls for you — and signals every invalid query with `RoomQlException`, a `RuntimeException`. Nothing throws while you are still configuring the builder, so a half-built query never blows up mid-DSL.
 
 ```kotlin
 import com.roomql.runtime.RoomQlException
@@ -446,7 +468,7 @@ try {
 }
 ```
 
-Cases that throw:
+Every case that throws:
 
 | Mistake | Message |
 |---|---|
@@ -454,14 +476,15 @@ Cases that throw:
 | `limit(0)` or negative | `limit() must be a positive integer, got 0` |
 | `offset()` without `limit()` | `offset() requires limit() to be set` |
 | `having { }` without `groupBy()` | `having() requires groupBy() to be set` |
+| `join()` after a raw-string `from(String)` | `join() requires from(EntityTable) so columns can be aliased; from(String) has no column metadata` |
 
-Because these throw at build time (not while configuring), a half-built builder never blows up mid-DSL.
+These are programming errors rather than user input errors, so they are unchecked by design: a query that is wrong is wrong on every run, and will fail the first time the code path executes.
 
 ---
 
-## 14. A complete repository
+## A complete repository
 
-Putting it together — a repository that exposes list, suspend, reactive, and JOIN queries:
+Putting it together — a repository exposing list, suspend, reactive, and JOIN queries:
 
 ```kotlin
 import com.roomql.android.toQuery
@@ -517,9 +540,9 @@ class UserRepository(
 
 ---
 
-## 15. Testing your queries
+## Testing generated SQL without a device
 
-Because `query { }` returns a plain `RoomQlQuery`, you can assert the generated SQL and args as pure JVM tests — no device, no Robolectric:
+Because `query { }` returns a plain `RoomQlQuery` from a pure-JVM module, you can assert on the generated SQL and arguments in an ordinary JUnit test — no emulator, no Robolectric, no database:
 
 ```kotlin
 @Test
@@ -536,8 +559,36 @@ fun `null status is omitted`() {
 }
 ```
 
-For full end-to-end coverage against a **real in-memory Room database** (JOIN results, `Flow` re-emission, null-skipping), see the runnable [`:sample`](../sample) module and run:
+Asserting on `sql` and `args` is the fastest way to pin down null-skipping behaviour, since each filter combination is a separate one-line case. For end-to-end coverage against a **real in-memory Room database** — JOIN result mapping, `Flow` re-emission, null-skipping through the whole stack — see the runnable [`:sample`](../sample) module:
 
 ```
 ./gradlew :sample:testDebugUnitTest
 ```
+
+---
+
+## Troubleshooting
+
+### Why does my RoomQL query return more rows than expected?
+
+A `null` filter value removes its condition from the SQL instead of matching `NULL`, so `status eq null` in RoomQL 1.0.0 produces no `WHERE` clause at all rather than `WHERE status IS NULL`. If a filter appears to be ignored, check whether the value reaching it is `null` — and use `isNull()` when you actually want to match SQL `NULL`.
+
+### Why doesn't my Flow re-emit when the table changes?
+
+Room cannot infer which tables a raw query reads, so a `Flow`-returning method must declare them itself: `@RawQuery(observedEntities = [UserEntity::class])`. If that list is missing or names the wrong entity, the `Flow` emits once and then goes quiet. Every table a RoomQL join touches has to appear in the list, not just the primary one.
+
+### Why do my JOIN result fields come back unmapped or zeroed?
+
+When joined tables share a column name, RoomQL aliases the colliding ones to `table__column` (for example `users__id`), so a result class asking for the bare name `id` matches nothing. Map those fields with `@ColumnInfo(name = "users__id")`; columns whose names are unique across the join keep their bare names.
+
+### Why does build() throw "join() requires from(EntityTable)"?
+
+RoomQL can only alias colliding columns if it knows what columns each table has, and the raw-string overload `from("users")` carries no such metadata. Use the generated `from(UserEntityTable)` for any query with a join — RoomQL raises `RoomQlException` here rather than silently emitting an unaliased `SELECT *` that would corrupt the mapped result.
+
+### Why isn't the generated *Table object resolving in my code?
+
+The `*Table` objects are generated by the RoomQL KSP processor into the **same package** as the entity, so check that `ksp(...)` (not `implementation(...)`) is applied to `roomql-ksp-processor`, that the `com.google.devtools.ksp` plugin is on the module, and that the module has been built at least once. If you set the `roomql.tableSuffix` option, the object's name ends with your suffix instead of `Table`.
+
+### Can I see the SQL a RoomQL query will run before running it?
+
+Yes — `query { }` returns a `RoomQlQuery` whose `sql` and `args` are ordinary readable properties, so `println(q.sql)` shows the exact statement and `q.args` the bound values in order. This works anywhere, including plain JVM unit tests, because inspecting a query needs neither Android nor a database connection.
