@@ -5,6 +5,20 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
+/**
+ * `@RoomQlDsl` (see [RoomQlDsl]) is a compile-time guarantee, not a runtime one, so it can't be
+ * asserted by a test here. Verified manually: pasting
+ * ```
+ * query { from("users"); where { limit(5) } }
+ * ```
+ * into this module fails `:runtime:compileKotlin` with
+ * "'fun limit(n: Int): Unit' cannot be called in this context with an implicit receiver."
+ * Re-check this by hand if `RoomQlDsl` is ever removed from a DSL scope class.
+ *
+ * Similarly, `like`/`notLike`/`contains` are constrained to `Column<T : String?>`, which is also
+ * a compile-time-only guarantee. Verified manually: `Column<Int>("age", "users") like "A%"` fails
+ * `:runtime:compileKotlin` with "Unresolved reference. ... receiver type mismatch."
+ */
 class QueryBuilderTest {
 
     // --- from() + bare SELECT ---
@@ -366,7 +380,7 @@ class QueryBuilderTest {
 
     // --- JOIN ---
 
-    private fun tableOf(name: String, vararg cols: String) = object : TableColumns {
+    private fun tableOf(name: String, vararg cols: String) = object : EntityTable {
         override val tableName = name
         override val allColumnNames = cols.toList()
     }
@@ -458,15 +472,15 @@ class QueryBuilderTest {
     }
 
     @Test
-    fun `join without column info falls back to SELECT star`() {
-        val result = query {
-            from("users")
-            join(tableOf("orders", "id", "user_id"), JoinType.INNER) {
-                on { Column<Long>("id", "users") eq Column<Long>("user_id", "orders") }
+    fun `join with a raw string from throws instead of silently dropping aliasing`() {
+        assertFailsWith<RoomQlException> {
+            query {
+                from("users")
+                join(tableOf("orders", "id", "user_id"), JoinType.INNER) {
+                    on { Column<Long>("id", "users") eq Column<Long>("user_id", "orders") }
+                }
             }
         }
-        assertTrue(result.sql.startsWith("SELECT * FROM users"))
-        assertTrue("INNER JOIN orders ON" in result.sql)
     }
 
     @Test
@@ -487,6 +501,72 @@ class QueryBuilderTest {
             result.sql
         )
         assertEquals(listOf("active"), result.args.toList())
+    }
+
+    @Test
+    fun `where on a colliding column name is qualified when joined`() {
+        val users = tableOf("users", "id", "name", "status")
+        val orders = tableOf("orders", "id", "user_id", "status")
+        val result = query {
+            from(users)
+            join(orders, JoinType.INNER) {
+                on { Column<Long>("id", "users") eq Column<Long>("user_id", "orders") }
+            }
+            where { Column<String>("status", "orders") eq "active" }
+        }
+        assertEquals(
+            "SELECT users.id AS users__id, name, users.status AS users__status," +
+                " orders.id AS orders__id, user_id, orders.status AS orders__status" +
+                " FROM users INNER JOIN orders ON users.id = orders.user_id" +
+                " WHERE orders.status = ?",
+            result.sql
+        )
+        assertEquals(listOf("active"), result.args.toList())
+    }
+
+    @Test
+    fun `groupBy and orderBy on a colliding column name are qualified when joined`() {
+        val users = tableOf("users", "id", "name")
+        val orders = tableOf("orders", "id", "user_id")
+        val result = query {
+            from(users)
+            join(orders, JoinType.INNER) {
+                on { Column<Long>("id", "users") eq Column<Long>("user_id", "orders") }
+            }
+            groupBy(Column<Long>("id", "users"))
+            orderBy(Column<Long>("id", "orders"), SortDirection.ASC)
+        }
+        assertTrue("GROUP BY users.id" in result.sql)
+        assertTrue("ORDER BY orders.id ASC" in result.sql)
+    }
+
+    @Test
+    fun `having on a colliding column name is qualified when joined`() {
+        val users = tableOf("users", "id", "name")
+        val orders = tableOf("orders", "id", "user_id")
+        val result = query {
+            from(users)
+            join(orders, JoinType.INNER) {
+                on { Column<Long>("id", "users") eq Column<Long>("user_id", "orders") }
+            }
+            groupBy(Column<Long>("id", "users"))
+            having { Column<Long>("id", "orders") gt 5L }
+        }
+        assertTrue("HAVING orders.id > ?" in result.sql)
+    }
+
+    @Test
+    fun `non-colliding columns stay unqualified when joined`() {
+        val users = tableOf("users", "id", "name")
+        val orders = tableOf("orders", "order_id", "user_id", "amount")
+        val result = query {
+            from(users)
+            join(orders, JoinType.INNER) {
+                on { Column<Long>("id", "users") eq Column<Long>("user_id", "orders") }
+            }
+            where { Column<Double>("amount", "orders") gt 100.0 }
+        }
+        assertTrue("WHERE amount > ?" in result.sql)
     }
 
     // --- Full query combining multiple clauses ---

@@ -6,6 +6,7 @@ import com.tschuchort.compiletesting.JvmCompilationResult
 import com.tschuchort.compiletesting.KotlinCompilation
 import com.tschuchort.compiletesting.SourceFile
 import com.tschuchort.compiletesting.configureKsp
+import com.tschuchort.compiletesting.kspProcessorOptions
 import com.tschuchort.compiletesting.kspSourcesDir
 import org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi
 import java.io.File
@@ -15,12 +16,16 @@ import kotlin.test.assertTrue
 
 class RoomQlProcessorTest {
 
-    private fun compile(vararg sources: SourceFile): Pair<JvmCompilationResult, KotlinCompilation> {
+    private fun compile(
+        vararg sources: SourceFile,
+        processorOptions: Map<String, String> = emptyMap(),
+    ): Pair<JvmCompilationResult, KotlinCompilation> {
         val compilation = KotlinCompilation().apply {
             this.sources = sources.toList()
             configureKsp(useKsp2 = true) {
                 symbolProcessorProviders += RoomQlProcessorProvider()
             }
+            kspProcessorOptions.putAll(processorOptions)
             inheritClassPath = true
             messageOutputStream = System.out
         }
@@ -35,7 +40,7 @@ class RoomQlProcessorTest {
     // --- basic entity with explicit tableName ---
 
     @Test
-    fun `generates columns object with explicit tableName`() {
+    fun `generates table object with explicit tableName`() {
         val entity = SourceFile.kotlin(
             "UserEntity.kt", """
             package test
@@ -64,7 +69,7 @@ class RoomQlProcessorTest {
     // --- entity with default tableName (uses class name) ---
 
     @Test
-    fun `generates columns object using class name as default tableName`() {
+    fun `generates table object using class name as default tableName`() {
         val entity = SourceFile.kotlin(
             "ProductEntity.kt", """
             package test
@@ -164,10 +169,61 @@ class RoomQlProcessorTest {
         assertTrue(generated.contains("package com.example.data") || generated.contains("package com.example.`data`"))
     }
 
-    // --- generated object implements TableColumns ---
+    // --- configurable *Table suffix ---
 
     @Test
-    fun `generated object implements TableColumns with tableName and allColumnNames`() {
+    fun `roomql tableSuffix option overrides the generated object name suffix`() {
+        val entity = SourceFile.kotlin(
+            "UserEntity.kt", """
+            package test
+            import androidx.room.Entity
+
+            @Entity(tableName = "users")
+            data class UserEntity(val id: Int)
+        """
+        )
+
+        val (result, compilation) = compile(entity, processorOptions = mapOf("roomql.tableSuffix" to "Cols"))
+
+        assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode)
+        findGeneratedFile(compilation, "UserEntityCols.kt")
+    }
+
+    // --- @Ignore ---
+
+    @Test
+    fun `Ignore'd properties are excluded from the generated columns and allColumnNames`() {
+        val entity = SourceFile.kotlin(
+            "UserEntity.kt", """
+            package test
+            import androidx.room.Entity
+            import androidx.room.Ignore
+
+            @Entity(tableName = "users")
+            data class UserEntity(
+                val id: Int,
+                val name: String,
+                @Ignore val fullNameCache: String = ""
+            )
+        """
+        )
+
+        val (result, compilation) = compile(entity)
+
+        assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode)
+
+        val generated = findGeneratedFile(compilation, "UserEntityTable.kt").readText()
+        assertTrue("val id" in generated)
+        assertTrue("val name" in generated)
+        assertTrue("fullNameCache" !in generated)
+        assertTrue(""""id"""" in generated)
+        assertTrue(""""name"""" in generated)
+    }
+
+    // --- generated object implements EntityTable ---
+
+    @Test
+    fun `generated object implements EntityTable with tableName and allColumnNames`() {
         val entity = SourceFile.kotlin(
             "ItemEntity.kt", """
             package test
@@ -187,7 +243,7 @@ class RoomQlProcessorTest {
         assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode)
 
         val generated = findGeneratedFile(compilation, "ItemEntityTable.kt").readText()
-        assertTrue("TableColumns" in generated)
+        assertTrue("EntityTable" in generated)
         assertTrue(""""items"""" in generated)
         assertTrue("allColumnNames" in generated)
         assertTrue(""""id"""" in generated)

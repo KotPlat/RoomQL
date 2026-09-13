@@ -29,7 +29,6 @@ kotlin {
 }
 
 dependencies {
-    implementation(project(":annotations"))
     implementation(project(":runtime"))
     implementation(project(":runtime-android"))
 
@@ -37,7 +36,7 @@ dependencies {
     implementation(libs.room.ktx)
     implementation(libs.coroutines.core)
 
-    // RoomQl KSP processor generates the *Columns objects; Room's KSP generates DAO_Impl.
+    // RoomQl KSP processor generates the *Table objects; Room's KSP generates DAO_Impl.
     ksp(project(":ksp-processor"))
     ksp(libs.room.compiler)
 

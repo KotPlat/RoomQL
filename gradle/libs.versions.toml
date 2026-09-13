@@ -4,8 +4,10 @@ ksp = "2.0.21-1.0.28"
 room = "2.6.1"
 kotlinpoet = "1.18.1"
 junit5 = "5.10.2"
+junitPlatform = "1.10.2"
 compileTesting = "0.5.1"
 agp = "8.11.1"
+bcv = "0.18.2"
 coroutines = "1.10.2"
 robolectric = "4.13"
 androidxTestCore = "1.6.1"
@@ -32,6 +34,7 @@ kotlinpoet-ksp = { module = "com.squareup:kotlinpoet-ksp", version.ref = "kotlin
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 junit5      = { module = "org.junit.jupiter:junit-jupiter",  version.ref = "junit5" }
 junit4      = { module = "junit:junit", version.ref = "junit4" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junitPlatform" }
 
 kotlin-compile-testing-ksp = { module = "dev.zacsweers.kctfork:ksp", version.ref = "compileTesting" }
 kotlin-compile-testing-core = { module = "dev.zacsweers.kctfork:core", version.ref = "compileTesting" }
@@ -41,3 +44,4 @@ kotlin-jvm     = { id = "org.jetbrains.kotlin.jvm",     version.ref = "kotlin" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 ksp            = { id = "com.google.devtools.ksp",      version.ref = "ksp" }
 android-library = { id = "com.android.library",         version.ref = "agp" }
+binary-compatibility-validator = { id = "org.jetbrains.kotlinx.binary-compatibility-validator", version.ref = "bcv" }

@@ -4,11 +4,13 @@
 
 A type-safe Kotlin DSL for building **dynamic** Room queries at runtime — no raw SQL strings, no reflection, no combinatorial explosion of `@Query` methods.
 
+> **Building dynamic Room queries with optional filters?** If you've fought the `@Query("... WHERE (:minAge IS NULL OR age >= :minAge)")` trick, watched a DAO sprout one method per filter combination (2ⁿ and counting), or had a renamed column break a query *silently at runtime*, RoomQL is for you. It composes Room's `SupportSQLiteQuery` at runtime through a compile-time-safe Kotlin builder — you keep `@RawQuery`, RoomQL builds the SQL.
+
 ---
 
 ## What it is
 
-RoomQL is a small library (four modules) that lets you compose SQLite queries with a Kotlin builder:
+RoomQL is a small library (three modules) that lets you compose SQLite queries with a Kotlin builder:
 
 ```kotlin
 val q = query {
@@ -34,7 +36,7 @@ Room gives you two ways to write a query with optional runtime filters, and both
 
 Neither scales with the number of optional parameters. RoomQL removes both by building the SQL programmatically, with the column names checked by the compiler.
 
-## What the solution brings
+## What you get
 
 - **Compile-time safety on column references.** `UserEntityTable.age` is generated from your entity. Renames and typos are caught at build time.
 - **Nullable filters that disappear.** A `null` value drops that condition from the SQL — no `if` ladders, no `IS NULL OR` tricks.
@@ -54,7 +56,7 @@ dependencyResolutionManagement {
 }
 ```
 
-A typical setup needs three artifacts (version catalog form):
+The full setup is three artifacts (version catalog form):
 
 ```toml
 [versions]
@@ -72,11 +74,11 @@ implementation(libs.roomql.runtime.android)   // the .toQuery() bridge to Room
 ksp(libs.roomql.ksp.processor)                // generates the *Table objects
 ```
 
-> `:runtime` is a plain-JVM module (the DSL and its `RoomQlQuery` output). `:runtime-android` is a thin Android module that adapts a `RoomQlQuery` into the `SupportSQLiteQuery` Room needs. You need both on Android; the split keeps the DSL unit-testable without an emulator. A fourth artifact, `roomql-annotations`, exists but is **not needed in v1** (see [Modules](#modules)).
+> `:runtime` is a plain-JVM module (the DSL and its `RoomQlQuery` output). `:runtime-android` is a thin Android module that adapts a `RoomQlQuery` into the `SupportSQLiteQuery` Room needs. You need both on Android; the split keeps the DSL unit-testable without an emulator.
 
 ### Requirements
 
-| | |
+| Dependency | Version |
 |---|---|
 | Kotlin | 2.0.x (KSP `2.0.21-1.0.28`) |
 | Room | 2.6.x–2.7.x |
@@ -97,7 +99,7 @@ data class UserEntity(
     val age: Int,
     val status: String,
 )
-// KSP generates: object UserEntityTable : TableColumns { id; name; age; status; ... }
+// KSP generates: object UserEntityTable : EntityTable { id; name; age; status; ... }
 ```
 
 `@ColumnInfo(name = "...")` and `@Entity(tableName = "...")` are respected — the generated refs use the real SQL names.
@@ -187,7 +189,7 @@ val q = query {
 orderDao.usersWithOrders(q.toQuery())
 ```
 
-When two joined tables share a column name (e.g. both have `id` and `status`), RoomQL aliases them as `users__id`, `orders__id`, etc. — **provided the primary table is given as a generated `*Table`** (`from(UserEntityTable)`). With the raw-string `from("users")` overload there is no column metadata to alias with, so the query falls back to `SELECT *` and collisions are *not* aliased. Your result POJO must map the aliased names for colliding columns:
+When two joined tables share a column name (e.g. both have `id` and `status`), RoomQL aliases them as `users__id`, `orders__id`, etc. — **provided the primary table is given as a generated `*Table`** (`from(UserEntityTable)`). The raw-string `from("users")` overload has no column metadata to alias with, so combining it with `join(...)` throws `RoomQlException` at `build()` rather than silently falling back to an unaliased `SELECT *`. Your result POJO must map the aliased names for colliding columns:
 
 ```kotlin
 data class UserOrder(
@@ -233,9 +235,8 @@ Be aware of these before adopting:
 | `:runtime` | `roomql-runtime` | the `query { }` DSL, `Column<T>`, conditions — pure JVM |
 | `:runtime-android` | `roomql-runtime-android` | `RoomQlQuery.toQuery()` → `SupportSQLiteQuery` |
 | `:ksp-processor` | `roomql-ksp-processor` | generates the `*Table` objects |
-| `:annotations` | `roomql-annotations` | `@QueryFunction` only — **unused in v1**, reserved for the #13 exploration |
 
-> **Integration.** RoomQL v1 uses Room's manual `@RawQuery` (you declare the method, call `query { }`, pass `.toQuery()`). A zero-boilerplate KSP-generated integration was explored and dropped — KSP cannot read function bodies, so it couldn't infer the query or `observedEntities`. See issues #6 / #13. The `@QueryFunction` annotation is retained for a potential compiler-plugin revival but does nothing today.
+> **Integration.** RoomQL v1 uses Room's manual `@RawQuery` (you declare the method, call `query { }`, pass `.toQuery()`). A zero-boilerplate annotation-driven integration was explored and dropped — KSP cannot read function bodies, so it couldn't infer the query or `observedEntities`. That work now lives on the `development` branch and is tracked for v2 in issues #6 / #13; v1 ships no annotation artifact.
 
 ## Working example
 

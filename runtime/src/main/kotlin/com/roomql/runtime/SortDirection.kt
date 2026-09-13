@@ -1,3 +1,6 @@
 package com.roomql.runtime
 
-enum class SortDirection { ASC, DESC }
+public enum class SortDirection(internal val keyword: String) {
+    ASC("ASC"),
+    DESC("DESC"),
+}
