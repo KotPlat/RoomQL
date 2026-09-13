@@ -66,7 +66,7 @@ dependencies {
 }
 ```
 
-> **1.0.0 is not tagged yet.** Until the release tag lands, JitPack has nothing to resolve — build the library locally with `VERSION=1.0.0 ./gradlew publishToMavenLocal` and put `mavenLocal()` ahead of JitPack in your repository list. This is exactly what [`demo/`](demo) does.
+> **1.0.0 is not tagged yet.** Until the release tag lands, JitPack has nothing to resolve — build the library locally with `VERSION=1.0.0 ./gradlew publishToMavenLocal` and put `mavenLocal()` ahead of JitPack in your repository list.
 
 All three are required on Android. `:runtime` is a plain-JVM module so the DSL stays unit-testable without an emulator; `:runtime-android` is the thin adapter that turns its output into the `SupportSQLiteQuery` Room wants. See [Modules](#modules) for what each one contains.
 
@@ -249,21 +249,9 @@ Know these before adopting:
 
 ## Runnable examples
 
-Three ship with RoomQL, aimed at different moments.
-
-**[`MinimalExample.kt`](sample/src/main/kotlin/com/roomql/sample/MinimalExample.kt) — start here.** The smallest complete setup in one annotated file: an entity, a `@RawQuery` DAO, a database, and a single query with two optional filters. Readable in one screen and written to be copied — rename the entity and you have a working dynamic query. [Its test](sample/src/test/kotlin/com/roomql/sample/MinimalExampleTest.kt) proves the copy-paste path runs.
-
-**[`:sample`](sample) — the full stack.** `@Entity` classes over a `products`/`brands` catalogue, a `@Database`, manual `@RawQuery` DAOs, a repository, and Robolectric tests exercising generated `*Table` → `query { }` → `.toQuery()` → in-memory Room, including nullable-filter skipping, JOIN aliasing, runtime sort and paging, and `Flow` re-emission.
-
-```
-./gradlew :sample:testDebugUnitTest
-```
-
-**[`demo/`](demo) — see the argument.** A Compose product-catalogue app whose flagship screen implements the same search **four ways** — RoomQL, `(:x IS NULL OR col = :x)`, 16 overloaded DAO methods, and hand-built string concatenation — switching between them at runtime while showing the SQL each produces. A test asserts all four return identical rows across all 16 filter combinations, so the comparison is verified rather than merely claimed. It is a standalone Gradle build consuming RoomQL from JitPack exactly as your app would:
-
-```
-./gradlew -p demo assembleDebug
-```
+- [`MinimalExample.kt`](sample/src/main/kotlin/com/roomql/sample/MinimalExample.kt) — the whole setup in one file, written to be copied.
+- [`:sample`](sample) — the same queries under Robolectric against in-memory Room: `./gradlew :sample:testDebugUnitTest`
+- [`demo/`](demo) — a Compose app comparing RoomQL against the approaches it replaces.
 
 ## Contributing and support
 
