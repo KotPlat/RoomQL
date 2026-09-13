@@ -34,6 +34,9 @@ object CatalogueSeed {
         "Edge", "Pulse", "Vertex", "Drift", "Ridge", "Atlas", "Quartz", "Ember",
     )
 
+    /** Derived from [brandNames] so it cannot drift out of step with the seeded brands. */
+    val countries: List<String> = brandNames.map { (_, country) -> country }.distinct().sorted()
+
     fun brands(): List<BrandEntity> =
         brandNames.mapIndexed { index, (name, country) ->
             BrandEntity(id = index + 1, name = name, country = country)

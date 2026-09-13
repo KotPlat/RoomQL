@@ -8,6 +8,7 @@ import com.roomql.demo.data.CatalogueSeed
 import com.roomql.demo.data.DatabaseProvider
 import com.roomql.demo.data.ProductWithBrand
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,7 +22,8 @@ data class FacetedUiState(
     val sql: String = "",
 ) {
     val categories: List<String> get() = CatalogueSeed.categories
-    val countries: List<String> get() = listOf("Japan", "Germany", "Sweden")
+    /** Every country the seed actually has a brand in, so no brand is unreachable. */
+    val countries: List<String> get() = CatalogueSeed.countries
 }
 
 class FacetedViewModel(application: Application) : AndroidViewModel(application) {
@@ -32,10 +34,13 @@ class FacetedViewModel(application: Application) : AndroidViewModel(application)
     private val _state = MutableStateFlow(FacetedUiState())
     val state: StateFlow<FacetedUiState> = _state.asStateFlow()
 
+    /** The in-flight query, cancelled whenever a newer one starts so the latest input wins. */
+    private var queryJob: Job? = null
+
     init {
         viewModelScope.launch {
             withContext(Dispatchers.IO) { DatabaseProvider.seedIfEmpty(db) }
-            run()
+            refresh()
         }
     }
 
@@ -44,18 +49,30 @@ class FacetedViewModel(application: Application) : AndroidViewModel(application)
         _state.value = _state.value.copy(
             selectedCategories = if (category in current) current - category else current + category,
         )
-        viewModelScope.launch { run() }
+        refresh()
     }
 
     /** One tap back to "no categories selected", which is also "no filter". */
     fun clearCategories() {
         _state.value = _state.value.copy(selectedCategories = emptySet())
-        viewModelScope.launch { run() }
+        refresh()
     }
 
     fun onCountry(country: String?) {
         _state.value = _state.value.copy(country = country)
-        viewModelScope.launch { run() }
+        refresh()
+    }
+
+    /**
+     * Re-runs the query, cancelling any query still in flight.
+     *
+     * Chip taps arrive faster than a joined query answers, so without the cancel two runs
+     * can overlap and the slower one wins, showing results for a chip selection the user
+     * has already changed.
+     */
+    private fun refresh() {
+        queryJob?.cancel()
+        queryJob = viewModelScope.launch { run() }
     }
 
     private suspend fun run() {
