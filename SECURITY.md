@@ -2,14 +2,13 @@
 
 ## Supported Versions
 
-RoomQL is pre-1.0. Security fixes are applied to the latest released line only;
-there are no long-term-support branches yet. Once 1.0 ships, this table will be
-updated with a proper support window.
+Security fixes are applied to the latest released line only; there are no
+long-term-support branches.
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.1.x   | :white_check_mark: |
-| < 0.1   | :x:                |
+| 1.0.x   | :white_check_mark: |
+| < 1.0   | :x:                |
 
 Always upgrade to the newest tag on JitPack to receive fixes.
 
