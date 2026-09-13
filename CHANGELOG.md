@@ -70,5 +70,5 @@ Annotation-driven DAO generation. KSP cannot read function bodies, so the query 
 [#6](https://github.com/ahmednobii/RoomQL/issues/6) and
 [#13](https://github.com/ahmednobii/RoomQL/issues/13).
 
-[Unreleased]: https://github.com/ahmednobii/RoomQL/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/ahmednobii/RoomQL/releases/tag/v1.0.0
+[Unreleased]: https://github.com/ahmednobii/RoomQL/compare/1.0.0...HEAD
+[1.0.0]: https://github.com/ahmednobii/RoomQL/releases/tag/1.0.0

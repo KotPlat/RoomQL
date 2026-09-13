@@ -8,6 +8,18 @@ plugins {
 group = "com.github.ahmednobii.RoomQL"
 version = System.getenv("VERSION") ?: "unspecified"
 
+// JitPack sets VERSION to the tag it is building; CI sets it explicitly. Without it the
+// version silently falls back to "unspecified" and publishes artifacts nothing can
+// resolve — which surfaces on JitPack as an unhelpful "No build artifacts found".
+// Fail at the publish step instead, where the cause is obvious.
+tasks.withType<AbstractPublishToMaven>().configureEach {
+    doFirst {
+        check(System.getenv("VERSION") != null) {
+            "VERSION is not set. Publish with: VERSION=<tag> ./gradlew $name"
+        }
+    }
+}
+
 android {
     namespace = "com.roomql.android"
     compileSdk = 36
