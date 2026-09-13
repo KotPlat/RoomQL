@@ -66,8 +66,6 @@ dependencies {
 }
 ```
 
-> **1.0.0 is not tagged yet.** Until the release tag lands, JitPack has nothing to resolve — build the library locally with `VERSION=1.0.0 ./gradlew publishToMavenLocal` and put `mavenLocal()` ahead of JitPack in your repository list.
-
 All three are required on Android. `:runtime` is a plain-JVM module so the DSL stays unit-testable without an emulator; `:runtime-android` is the thin adapter that turns its output into the `SupportSQLiteQuery` Room wants. See [Modules](#modules) for what each one contains.
 
 ### Requirements
