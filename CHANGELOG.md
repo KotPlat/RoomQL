@@ -6,37 +6,16 @@ All notable changes to **RoomQL** are documented here. The format follows
 
 ## [Unreleased]
 
-### Added
+_Nothing yet._
 
-- **`MinimalExample.kt`** in `:sample` — the smallest complete RoomQL setup (one entity, one
-  `@RawQuery` DAO, one database, one query) in a single annotated file, with its own test.
-  The copy-paste path for a first query.
-- **Demo app** (`demo/`) — a standalone Compose product-catalogue build whose flagship screen
-  implements the same four-filter search four ways (RoomQL, `(:x IS NULL OR col = :x)`, 16
-  overloaded DAO methods, hand-built string concatenation), switchable at runtime with a live
-  readout of the SQL each produces. A test asserts all four return identical rows across all 16
-  filter combinations. It consumes RoomQL through its published coordinates, so building it
-  verifies the documented install path.
-- **Consumer R8 rules** — `roomql-runtime-android` now ships `consumer-rules.pro`, packaged into
-  the aar as `proguard.txt`. It carries no keep rules, because RoomQL needs none: table and column
-  names are baked in as string literals, so obfuscation cannot alter the generated SQL. CI scans
-  the published artifacts for reflection on every run, so the guarantee is enforced rather than
-  asserted.
-- **[API reference](docs/API.md)** — every public type, function, and operator with its
-  signature, generated SQL, and null-skipping behaviour.
-
-### Changed
-
-- `:sample` moves from a users/orders domain to a product catalogue of `products` and `brands`,
-  whose colliding `id`/`name` columns exercise RoomQL's `table__column` join aliasing. Its test
-  suite grows from 7 cases to 16.
-- CI publishes the library to Maven local and builds the demo against it, so the published
-  coordinates are verified rather than assumed.
-
-## [1.0.0] — unreleased
+## [1.0.0] — 2026-09-13
 
 First stable release. Three artifacts, published on JitPack:
 `roomql-runtime`, `roomql-runtime-android`, `roomql-ksp-processor`.
+
+RoomQL builds Room queries whose filters are decided at runtime, without raw SQL strings,
+reflection, or one DAO method per filter combination. A `null` filter drops out of the
+generated SQL rather than matching `NULL`.
 
 ### Added
 
@@ -56,12 +35,25 @@ First stable release. Three artifacts, published on JitPack:
   and skips `@Ignore`d properties. Object name suffix configurable via the `roomql.tableSuffix` option.
 - **`RoomQlQuery.toQuery()`** (`roomql-runtime-android`) — adapts the DSL output to the
   `SupportSQLiteQuery` Room's `@RawQuery` methods accept.
-- **`:sample` module** — a runnable, Robolectric-tested end-to-end reference covering nullable-filter
-  skipping, JOIN mapping, and `Flow` re-emission.
+- **Consumer R8 rules** — `roomql-runtime-android` ships `consumer-rules.pro`, packaged into the aar
+  as `proguard.txt`. It carries no keep rules, because RoomQL needs none: table and column names are
+  baked into generated code as string literals, so obfuscation cannot alter the SQL the DSL emits.
+  CI scans the published artifacts for reflection on every run, so the guarantee is enforced rather
+  than asserted.
 - **`explicitApi()` and Binary Compatibility Validator** on all three published modules, so the public
   API surface is checked in CI (`./gradlew apiCheck`).
 - **Published POM metadata** — name, description, license, developer, SCM, and issue-tracker fields
   on all three artifacts.
+
+### Documentation and examples
+
+- **[Usage guide](docs/USAGE.md)** — every capability as a worked example, with the SQL each generates.
+- **[API reference](docs/API.md)** — every public type, function, and operator with its signature,
+  generated SQL, and null-skipping behaviour.
+- **Runnable examples** — `MinimalExample.kt` (the whole setup in one annotated file, with its own
+  test), the `:sample` module's Robolectric coverage against in-memory Room, and a Compose demo app.
+  These live in the repository only; none of them is published, and no example code ships inside the
+  three artifacts.
 
 ### Validation
 
