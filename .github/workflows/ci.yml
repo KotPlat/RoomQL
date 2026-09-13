@@ -45,6 +45,12 @@ jobs:
       - name: Publish library to Maven local
         run: VERSION=1.0.0 ./gradlew publishToMavenLocal
 
+      # RoomQL promises consumers they need no keep rules. That holds only while the
+      # published artifacts stay free of reflection and name derivation, so it is checked
+      # against the real jar and aar rather than asserted in the README.
+      - name: Verify no reflection in published artifacts
+        run: ./scripts/verify-no-reflection.sh 1.0.0
+
       - name: Build demo app
         run: ./gradlew -p demo assembleDebug
 
