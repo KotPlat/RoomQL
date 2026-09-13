@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640">
+  <!-- GitHub social preview card, 1280x640. Built from the same mark, wordmark, and
+       palette as docs/banner.svg and docs/icon.svg so every surface stays one brand. -->
+
+  <rect width="1280" height="640" fill="#161616"/>
+
+  <!-- Hairline frame, keeps the card from bleeding into light backgrounds -->
+  <rect x="0.5" y="0.5" width="1279" height="639" fill="none" stroke="#3ddc84" stroke-opacity="0.18" stroke-width="1"/>
+
+  <!-- Icon tile: same geometry as docs/icon.svg, scaled 160 -> 200 -->
+  <g transform="translate(96, 150)">
+    <rect width="200" height="200" rx="35" fill="#1c1c1e"/>
+    <g transform="scale(1.25)">
+      <path d="M 38 50 L 78 80 L 38 110" stroke="#3ddc84" stroke-width="11" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <line x1="88" y1="69" x2="130" y2="69" stroke="#3ddc84" stroke-width="9" stroke-linecap="round"/>
+      <line x1="88" y1="90" x2="118" y2="90" stroke="#3ddc84" stroke-width="9" stroke-linecap="round"/>
+    </g>
+  </g>
+
+  <!-- Wordmark: room (white) + ql (green), as on the banner -->
+  <text font-family="'Courier New', Courier, monospace" font-size="132" font-weight="800" letter-spacing="-2">
+    <tspan x="348" y="268" fill="#ffffff">room</tspan><tspan fill="#3ddc84">ql</tspan>
+  </text>
+
+  <!-- Tagline -->
+  <text x="352" y="330" font-family="'Courier New', Courier, monospace" font-size="33" fill="#ffffff" fill-opacity="0.72">type-safe dynamic Room queries</text>
+
+  <!-- The differentiator, shown rather than claimed -->
+  <g transform="translate(96, 404)">
+    <rect width="1088" height="150" rx="16" fill="#1c1c1e"/>
+    <text x="40" y="58" font-family="'Courier New', Courier, monospace" font-size="30" fill="#ffffff" fill-opacity="0.55">where {</text>
+    <text x="72" y="100" font-family="'Courier New', Courier, monospace" font-size="30">
+      <tspan fill="#3ddc84">age gte minAge</tspan><tspan fill="#ffffff" fill-opacity="0.45">   // dropped when null</tspan>
+    </text>
+    <text x="40" y="134" font-family="'Courier New', Courier, monospace" font-size="30" fill="#ffffff" fill-opacity="0.55">}</text>
+  </g>
+</svg>
