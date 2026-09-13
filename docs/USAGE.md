@@ -25,7 +25,8 @@ Every example shows the **Kotlin** you write and the **SQL** RoomQL generates, s
 13. [Error handling: what build() rejects and why](#error-handling-what-build-rejects-and-why)
 14. [A complete repository](#a-complete-repository)
 15. [Testing generated SQL without a device](#testing-generated-sql-without-a-device)
-16. [Troubleshooting](#troubleshooting)
+16. [Runnable examples](#runnable-examples)
+17. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -559,13 +560,27 @@ fun `null status is omitted`() {
 }
 ```
 
-Asserting on `sql` and `args` is the fastest way to pin down null-skipping behaviour, since each filter combination is a separate one-line case. For end-to-end coverage against a **real in-memory Room database** — JOIN result mapping, `Flow` re-emission, null-skipping through the whole stack — see the runnable [`:sample`](../sample) module, a product catalogue of `products` and `brands`:
+Asserting on `sql` and `args` is the fastest way to pin down null-skipping behaviour, since each filter combination is a separate one-line case. For end-to-end coverage against a real in-memory Room database, see the runnable examples below.
+
+---
+
+## Runnable examples
+
+Three ship with RoomQL, aimed at different moments.
+
+**[`MinimalExample.kt`](../sample/src/main/kotlin/com/roomql/sample/MinimalExample.kt) — start here.** The smallest complete setup in one annotated file: an entity, a `@RawQuery` DAO, a database, and a single query with two optional filters. Readable in one screen and written to be copied — rename the entity and you have a working dynamic query. [Its test](../sample/src/test/kotlin/com/roomql/sample/MinimalExampleTest.kt) drives it against a real database, so the copy-paste path is known to run.
+
+**[`:sample`](../sample) — the full stack.** A product catalogue of `products` and `brands` with `@Entity` classes, a `@Database`, manual `@RawQuery` DAOs, a repository, and Robolectric tests exercising generated `*Table` → `query { }` → `.toQuery()` → in-memory Room. Covers the behaviour that only shows up end to end: null-skipping through the whole stack, JOIN result mapping through the `table__column` aliases, runtime sort and paging, and `Flow` re-emission.
 
 ```
 ./gradlew :sample:testDebugUnitTest
 ```
 
-To see these same queries driving a real UI — and compared side by side against the approaches RoomQL replaces — see the [demo app](../demo).
+**[`demo/`](../demo) — the same queries driving a UI.** A Compose app whose flagship screen implements one four-filter search four ways — RoomQL, `(:x IS NULL OR col = :x)`, 16 overloaded DAO methods, and hand-built string concatenation — switching between them at runtime while showing the SQL each produces. A test asserts all four return identical rows across all 16 filter combinations, so the comparison is verified rather than claimed. It is a standalone Gradle build consuming RoomQL through its published coordinates, exactly as your app would:
+
+```
+./gradlew -p demo assembleDebug
+```
 
 ---
 

@@ -247,12 +247,6 @@ Know these before adopting:
 
 > **On annotation-driven integration.** RoomQL 1.0.0 uses Room's manual `@RawQuery`: you declare the method, build with `query { }`, and pass `.toQuery()`. A zero-boilerplate annotation-driven integration was explored and dropped — KSP cannot read function bodies, so it could not infer the query or `observedEntities`. That work lives on the `development` branch and is tracked for v2 in issues [#6](https://github.com/ahmednobii/RoomQL/issues/6) and [#13](https://github.com/ahmednobii/RoomQL/issues/13). v1 ships no annotation artifact.
 
-## Runnable examples
-
-- [`MinimalExample.kt`](sample/src/main/kotlin/com/roomql/sample/MinimalExample.kt) — the whole setup in one file, written to be copied.
-- [`:sample`](sample) — the same queries under Robolectric against in-memory Room: `./gradlew :sample:testDebugUnitTest`
-- [`demo/`](demo) — a Compose app comparing RoomQL against the approaches it replaces.
-
 ## Contributing and support
 
 Bug reports, feature requests, and questions all go to [GitHub Issues](https://github.com/ahmednobii/RoomQL/issues). See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request, [CHANGELOG.md](CHANGELOG.md) for release notes, and [SECURITY.md](SECURITY.md) to report a vulnerability privately.
