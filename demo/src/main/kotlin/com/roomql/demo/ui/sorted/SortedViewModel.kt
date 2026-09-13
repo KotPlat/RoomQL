@@ -9,6 +9,7 @@ import com.roomql.demo.data.DatabaseProvider
 import com.roomql.demo.data.ProductEntity
 import com.roomql.demo.data.SortColumn
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,34 +38,49 @@ class SortedViewModel(application: Application) : AndroidViewModel(application) 
     private val _state = MutableStateFlow(SortedUiState())
     val state: StateFlow<SortedUiState> = _state.asStateFlow()
 
+    /** The in-flight query, cancelled whenever a newer one starts so the latest input wins. */
+    private var queryJob: Job? = null
+
     init {
         viewModelScope.launch {
             withContext(Dispatchers.IO) { DatabaseProvider.seedIfEmpty(db) }
-            run()
+            refresh()
         }
     }
 
     fun onSortColumn(column: SortColumn) {
         _state.value = _state.value.copy(sortColumn = column, page = 0)
-        viewModelScope.launch { run() }
+        refresh()
     }
 
     fun toggleDirection() {
         val next =
             if (_state.value.direction == SortDirection.ASC) SortDirection.DESC else SortDirection.ASC
         _state.value = _state.value.copy(direction = next, page = 0)
-        viewModelScope.launch { run() }
+        refresh()
     }
 
     fun nextPage() {
         _state.value = _state.value.copy(page = _state.value.page + 1)
-        viewModelScope.launch { run() }
+        refresh()
     }
 
     fun previousPage() {
         if (_state.value.page == 0) return
         _state.value = _state.value.copy(page = _state.value.page - 1)
-        viewModelScope.launch { run() }
+        refresh()
+    }
+
+    /**
+     * Re-runs the query, cancelling any query still in flight.
+     *
+     * Paging taps arrive faster than SQLite answers, so without the cancel two runs can
+     * overlap and the slower one wins, leaving the list showing a page the user has
+     * already moved past.
+     */
+    private fun refresh() {
+        queryJob?.cancel()
+        queryJob = viewModelScope.launch { run() }
     }
 
     /**
