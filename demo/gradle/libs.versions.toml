@@ -1,0 +1,47 @@
+[versions]
+# Must stay compatible with the RoomQL release named by `roomql` below.
+kotlin = "2.0.21"
+ksp = "2.0.21-1.0.28"
+agp = "8.11.1"
+roomql = "1.0.0"
+room = "2.6.1"
+coroutines = "1.10.2"
+composeBom = "2024.09.00"
+activityCompose = "1.9.2"
+lifecycle = "2.8.6"
+navigationCompose = "2.8.2"
+robolectric = "4.13"
+androidxTestCore = "1.6.1"
+junit4 = "4.13.2"
+
+[libraries]
+roomql-runtime         = { module = "com.github.ahmednobii.RoomQL:roomql-runtime",         version.ref = "roomql" }
+roomql-runtime-android = { module = "com.github.ahmednobii.RoomQL:roomql-runtime-android", version.ref = "roomql" }
+roomql-ksp-processor   = { module = "com.github.ahmednobii.RoomQL:roomql-ksp-processor",   version.ref = "roomql" }
+
+room-runtime  = { module = "androidx.room:room-runtime",  version.ref = "room" }
+room-ktx      = { module = "androidx.room:room-ktx",      version.ref = "room" }
+room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
+
+coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
+
+compose-bom                = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }
+compose-ui                 = { module = "androidx.compose.ui:ui" }
+compose-ui-tooling         = { module = "androidx.compose.ui:ui-tooling" }
+compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
+compose-material3          = { module = "androidx.compose.material3:material3" }
+androidx-activity-compose  = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
+androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+androidx-lifecycle-runtime-compose   = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
+androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigationCompose" }
+
+robolectric        = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+androidx-test-core = { module = "androidx.test:core", version.ref = "androidxTestCore" }
+junit4             = { module = "junit:junit", version.ref = "junit4" }
+
+[plugins]
+android-application = { id = "com.android.application",             version.ref = "agp" }
+kotlin-android      = { id = "org.jetbrains.kotlin.android",        version.ref = "kotlin" }
+compose-compiler    = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+ksp                 = { id = "com.google.devtools.ksp",             version.ref = "ksp" }

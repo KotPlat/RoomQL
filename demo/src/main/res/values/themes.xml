@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Compose draws the UI; this theme sets the window chrome so there is no white
+         flash before the brand-coloured surface appears. -->
+    <style name="Theme.RoomQlDemo" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/roomql_ink</item>
+        <item name="android:statusBarColor">@color/roomql_ink</item>
+        <item name="android:navigationBarColor">@color/roomql_ink</item>
+        <item name="android:colorAccent">@color/roomql_green</item>
+    </style>
+</resources>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- RoomQL brand palette, taken from docs/banner.svg and docs/icon.svg. -->
+<resources>
+    <color name="roomql_green">#3DDC84</color>
+    <color name="roomql_ink">#161616</color>
+    <color name="roomql_tile">#1C1C1E</color>
+    <color name="ic_launcher_background">#1C1C1E</color>
+</resources>
