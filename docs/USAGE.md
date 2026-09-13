@@ -559,11 +559,13 @@ fun `null status is omitted`() {
 }
 ```
 
-Asserting on `sql` and `args` is the fastest way to pin down null-skipping behaviour, since each filter combination is a separate one-line case. For end-to-end coverage against a **real in-memory Room database** — JOIN result mapping, `Flow` re-emission, null-skipping through the whole stack — see the runnable [`:sample`](../sample) module:
+Asserting on `sql` and `args` is the fastest way to pin down null-skipping behaviour, since each filter combination is a separate one-line case. For end-to-end coverage against a **real in-memory Room database** — JOIN result mapping, `Flow` re-emission, null-skipping through the whole stack — see the runnable [`:sample`](../sample) module, a product catalogue of `products` and `brands`:
 
 ```
 ./gradlew :sample:testDebugUnitTest
 ```
+
+To see these same queries driving a real UI — and compared side by side against the approaches RoomQL replaces — see the [demo app](../demo).
 
 ---
 
