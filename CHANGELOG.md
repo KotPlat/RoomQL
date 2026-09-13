@@ -17,6 +17,11 @@ All notable changes to **RoomQL** are documented here. The format follows
   readout of the SQL each produces. A test asserts all four return identical rows across all 16
   filter combinations. It consumes RoomQL through its published coordinates, so building it
   verifies the documented install path.
+- **Consumer R8 rules** — `roomql-runtime-android` now ships `consumer-rules.pro`, packaged into
+  the aar as `proguard.txt`. It carries no keep rules, because RoomQL needs none: table and column
+  names are baked in as string literals, so obfuscation cannot alter the generated SQL. CI scans
+  the published artifacts for reflection on every run, so the guarantee is enforced rather than
+  asserted.
 - **[API reference](docs/API.md)** — every public type, function, and operator with its
   signature, generated SQL, and null-skipping behaviour.
 
