@@ -59,4 +59,4 @@ The 16-method DAO is deliberately written out in full. The tedium is the argumen
 
 - The catalogue is ~500 deterministically generated rows, seeded on first launch, so runs and tests are reproducible.
 - `minSdk 21`, `targetSdk 36`. Robolectric runs the tests pinned to SDK 34, the newest it supports.
-- Looking for the **minimal** RoomQL example instead? See [`:sample`](../sample) — a small library module with entities, a `@RawQuery` DAO, a repository, and tests, and nothing else.
+- Looking for the **minimal** RoomQL example instead? See [`MinimalExample.kt`](../sample/src/main/kotlin/com/roomql/sample/MinimalExample.kt) — one annotated file with an entity, a `@RawQuery` DAO, a database, and a single query. [`:sample`](../sample) covers the full stack in Robolectric tests.

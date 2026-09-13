@@ -249,9 +249,11 @@ Know these before adopting:
 
 ## Runnable examples
 
-Two ship with RoomQL, aimed at different moments.
+Three ship with RoomQL, aimed at different moments.
 
-**[`:sample`](sample) — start here.** A minimal library module: `@Entity` classes, a `@Database`, manual `@RawQuery` DAOs, a repository, and Robolectric tests exercising the whole stack — generated `*Table` → `query { }` → `.toQuery()` → in-memory Room — including nullable-filter skipping, JOIN mapping, and `Flow` re-emission. Small enough to read in one sitting and copy from.
+**[`MinimalExample.kt`](sample/src/main/kotlin/com/roomql/sample/MinimalExample.kt) — start here.** The smallest complete setup in one annotated file: an entity, a `@RawQuery` DAO, a database, and a single query with two optional filters. Readable in one screen and written to be copied — rename the entity and you have a working dynamic query. [Its test](sample/src/test/kotlin/com/roomql/sample/MinimalExampleTest.kt) proves the copy-paste path runs.
+
+**[`:sample`](sample) — the full stack.** `@Entity` classes over a `products`/`brands` catalogue, a `@Database`, manual `@RawQuery` DAOs, a repository, and Robolectric tests exercising generated `*Table` → `query { }` → `.toQuery()` → in-memory Room, including nullable-filter skipping, JOIN aliasing, runtime sort and paging, and `Flow` re-emission.
 
 ```
 ./gradlew :sample:testDebugUnitTest
