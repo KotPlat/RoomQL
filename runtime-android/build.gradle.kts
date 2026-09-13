@@ -14,6 +14,11 @@ android {
 
     defaultConfig {
         minSdk = 21
+
+        // Packaged into the AAR as proguard.txt and applied to every consuming app.
+        // Carries no keep rules today; see the file for why, and for where a rule would
+        // go if RoomQL ever needs one.
+        consumerProguardFiles("consumer-rules.pro")
     }
 
     compileOptions {

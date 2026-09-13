@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The RoomQL mark, matching docs/icon.svg exactly: a > chevron and two query rows. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="160"
+    android:viewportHeight="160">
+
+    <!-- Scaled into the adaptive-icon safe zone; geometry stays in the SVG's 160x160 space. -->
+    <group
+        android:pivotX="80"
+        android:pivotY="80"
+        android:scaleX="0.62"
+        android:scaleY="0.62">
+
+        <path
+            android:pathData="M 38 50 L 78 80 L 38 110"
+            android:strokeColor="#3DDC84"
+            android:strokeWidth="11"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="M 88 69 L 130 69"
+            android:strokeColor="#3DDC84"
+            android:strokeWidth="9"
+            android:strokeLineCap="round" />
+        <path
+            android:pathData="M 88 90 L 118 90"
+            android:strokeColor="#3DDC84"
+            android:strokeWidth="9"
+            android:strokeLineCap="round" />
+    </group>
+</vector>

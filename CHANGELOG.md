@@ -6,7 +6,32 @@ All notable changes to **RoomQL** are documented here. The format follows
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- **`MinimalExample.kt`** in `:sample` — the smallest complete RoomQL setup (one entity, one
+  `@RawQuery` DAO, one database, one query) in a single annotated file, with its own test.
+  The copy-paste path for a first query.
+- **Demo app** (`demo/`) — a standalone Compose product-catalogue build whose flagship screen
+  implements the same four-filter search four ways (RoomQL, `(:x IS NULL OR col = :x)`, 16
+  overloaded DAO methods, hand-built string concatenation), switchable at runtime with a live
+  readout of the SQL each produces. A test asserts all four return identical rows across all 16
+  filter combinations. It consumes RoomQL through its published coordinates, so building it
+  verifies the documented install path.
+- **Consumer R8 rules** — `roomql-runtime-android` now ships `consumer-rules.pro`, packaged into
+  the aar as `proguard.txt`. It carries no keep rules, because RoomQL needs none: table and column
+  names are baked in as string literals, so obfuscation cannot alter the generated SQL. CI scans
+  the published artifacts for reflection on every run, so the guarantee is enforced rather than
+  asserted.
+- **[API reference](docs/API.md)** — every public type, function, and operator with its
+  signature, generated SQL, and null-skipping behaviour.
+
+### Changed
+
+- `:sample` moves from a users/orders domain to a product catalogue of `products` and `brands`,
+  whose colliding `id`/`name` columns exercise RoomQL's `table__column` join aliasing. Its test
+  suite grows from 7 cases to 16.
+- CI publishes the library to Maven local and builds the demo against it, so the published
+  coordinates are verified rather than assumed.
 
 ## [1.0.0] — unreleased
 
