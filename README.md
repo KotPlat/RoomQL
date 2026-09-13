@@ -28,6 +28,12 @@
 
 Room has no good answer for a query whose filters are decided at runtime. Write it as a `@Query` string and you end up with `WHERE (:minAge IS NULL OR age >= :minAge)` repeated per filter, with column names the compiler never checks — rename a column and the query breaks *silently at runtime*. Write it as overloaded DAO methods and you need one method per filter combination, heading toward 2ⁿ. **RoomQL** builds the SQL programmatically instead: you keep Room's `@RawQuery`, a KSP processor generates a typed `Column<T>` for every column in your `@Entity` classes, and a `null` filter simply drops out of the generated SQL.
 
+<p align="center">
+  <img src="docs/null-drops-out.gif" alt="One query block; the generated SQL shrinks as each filter becomes null" width="900"/>
+</p>
+
+<p align="center"><sub>One <code>query { }</code> block. As each filter goes <code>null</code>, its condition leaves the SQL — no <code>if</code> ladder, no <code>IS NULL OR</code>.</sub></p>
+
 ## Installation
 
 RoomQL 1.0.0 publishes through JitPack. Add the repository in `settings.gradle.kts`:
