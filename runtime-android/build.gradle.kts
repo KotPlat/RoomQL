@@ -5,10 +5,11 @@ plugins {
     `maven-publish`
 }
 
-group = "com.github.ahmednobii.RoomQL"
+group = "io.github.kotplat.roomql"
 version = System.getenv("VERSION") ?: "unspecified"
 
-// JitPack sets VERSION to the tag it is building; CI sets it explicitly. Without it the
+// JitPack and the Maven Central release workflow both set VERSION to the tag being
+// built; local CI runs set it explicitly. Without it the
 // version silently falls back to "unspecified" and publishes artifacts nothing can
 // resolve — which surfaces on JitPack as an unhelpful "No build artifacts found".
 // Fail at the publish step instead, where the cause is obvious.
@@ -60,7 +61,7 @@ dependencies {
 publishing {
     publications {
         create<MavenPublication>("maven") {
-            artifactId = "roomql-runtime-android"
+            artifactId = "runtime-android"
             afterEvaluate {
                 from(components["release"])
             }
@@ -68,7 +69,7 @@ publishing {
             pom {
                 name.set("RoomQL Runtime for Android")
                 description.set("Android bridge for RoomQL: adapts a RoomQlQuery into the SupportSQLiteQuery that Room @RawQuery methods accept.")
-                url.set("https://github.com/ahmednobii/RoomQL")
+                url.set("https://github.com/KotPlat/RoomQL")
                 inceptionYear.set("2026")
 
                 licenses {
@@ -86,13 +87,13 @@ publishing {
                     }
                 }
                 scm {
-                    url.set("https://github.com/ahmednobii/RoomQL")
-                    connection.set("scm:git:https://github.com/ahmednobii/RoomQL.git")
-                    developerConnection.set("scm:git:ssh://git@github.com/ahmednobii/RoomQL.git")
+                    url.set("https://github.com/KotPlat/RoomQL")
+                    connection.set("scm:git:https://github.com/KotPlat/RoomQL.git")
+                    developerConnection.set("scm:git:ssh://git@github.com/KotPlat/RoomQL.git")
                 }
                 issueManagement {
                     system.set("GitHub Issues")
-                    url.set("https://github.com/ahmednobii/RoomQL/issues")
+                    url.set("https://github.com/KotPlat/RoomQL/issues")
                 }
             }
         }

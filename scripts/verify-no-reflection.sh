@@ -19,10 +19,10 @@
 set -euo pipefail
 
 VERSION="${1:-2.0.0}"
-REPO="${HOME}/.m2/repository/com/github/ahmednobii/RoomQL"
+REPO="${HOME}/.m2/repository/io/github/kotplat/roomql"
 
-RUNTIME_JAR="${REPO}/roomql-runtime/${VERSION}/roomql-runtime-${VERSION}.jar"
-ANDROID_AAR="${REPO}/roomql-runtime-android/${VERSION}/roomql-runtime-android-${VERSION}.aar"
+RUNTIME_JAR="${REPO}/runtime/${VERSION}/runtime-${VERSION}.jar"
+ANDROID_AAR="${REPO}/runtime-android/${VERSION}/runtime-android-${VERSION}.aar"
 
 for artifact in "$RUNTIME_JAR" "$ANDROID_AAR"; do
     if [[ ! -f "$artifact" ]]; then
@@ -67,6 +67,6 @@ if (( violations > 0 )); then
     exit 1
 fi
 
-echo "verify-no-reflection: OK — $scanned classes scanned across roomql-runtime and"
-echo "roomql-runtime-android ${VERSION}; no reflection, no name derivation."
+echo "verify-no-reflection: OK — $scanned classes scanned across runtime and"
+echo "runtime-android ${VERSION}; no reflection, no name derivation."
 echo "Consumers need no RoomQL-specific keep rules."

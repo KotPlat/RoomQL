@@ -4,10 +4,11 @@ plugins {
     `maven-publish`
 }
 
-group = "com.github.ahmednobii.RoomQL"
+group = "io.github.kotplat.roomql"
 version = System.getenv("VERSION") ?: "unspecified"
 
-// JitPack sets VERSION to the tag it is building; CI sets it explicitly. Without it the
+// JitPack and the Maven Central release workflow both set VERSION to the tag being
+// built; local CI runs set it explicitly. Without it the
 // version silently falls back to "unspecified" and publishes artifacts nothing can
 // resolve — which surfaces on JitPack as an unhelpful "No build artifacts found".
 // Fail at the publish step instead, where the cause is obvious.
@@ -41,13 +42,13 @@ tasks.test {
 publishing {
     publications {
         create<MavenPublication>("maven") {
-            artifactId = "roomql-runtime"
+            artifactId = "runtime"
             from(components["java"])
 
             pom {
                 name.set("RoomQL Runtime")
                 description.set("Type-safe Kotlin DSL for building dynamic Android Room queries at runtime: the query { } builder, typed Column references, and required/IfNotNull condition pairs for filters that can disappear. Pure JVM, unit-testable without an emulator.")
-                url.set("https://github.com/ahmednobii/RoomQL")
+                url.set("https://github.com/KotPlat/RoomQL")
                 inceptionYear.set("2026")
 
                 licenses {
@@ -65,13 +66,13 @@ publishing {
                     }
                 }
                 scm {
-                    url.set("https://github.com/ahmednobii/RoomQL")
-                    connection.set("scm:git:https://github.com/ahmednobii/RoomQL.git")
-                    developerConnection.set("scm:git:ssh://git@github.com/ahmednobii/RoomQL.git")
+                    url.set("https://github.com/KotPlat/RoomQL")
+                    connection.set("scm:git:https://github.com/KotPlat/RoomQL.git")
+                    developerConnection.set("scm:git:ssh://git@github.com/KotPlat/RoomQL.git")
                 }
                 issueManagement {
                     system.set("GitHub Issues")
-                    url.set("https://github.com/ahmednobii/RoomQL/issues")
+                    url.set("https://github.com/KotPlat/RoomQL/issues")
                 }
             }
         }

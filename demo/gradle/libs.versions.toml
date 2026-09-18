@@ -15,9 +15,9 @@ androidxTestCore = "1.6.1"
 junit4 = "4.13.2"
 
 [libraries]
-roomql-runtime         = { module = "com.github.ahmednobii.RoomQL:roomql-runtime",         version.ref = "roomql" }
-roomql-runtime-android = { module = "com.github.ahmednobii.RoomQL:roomql-runtime-android", version.ref = "roomql" }
-roomql-ksp-processor   = { module = "com.github.ahmednobii.RoomQL:roomql-ksp-processor",   version.ref = "roomql" }
+roomql-runtime         = { module = "io.github.kotplat.roomql:runtime",         version.ref = "roomql" }
+roomql-runtime-android = { module = "io.github.kotplat.roomql:runtime-android", version.ref = "roomql" }
+roomql-ksp-processor   = { module = "io.github.kotplat.roomql:ksp-processor",   version.ref = "roomql" }
 
 room-runtime  = { module = "androidx.room:room-runtime",  version.ref = "room" }
 room-ktx      = { module = "androidx.room:room-ktx",      version.ref = "room" }
