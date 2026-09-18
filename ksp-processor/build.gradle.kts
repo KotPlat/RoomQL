@@ -1,7 +1,10 @@
 plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.binary.compatibility.validator)
+    alias(libs.plugins.dokka)
+    alias(libs.plugins.dokka.javadoc)
     `maven-publish`
+    signing
 }
 
 group = "io.github.kotplat.roomql"
@@ -46,11 +49,20 @@ tasks.test {
     useJUnitPlatform()
 }
 
+// Maven Central requires a Javadoc jar alongside every artifact. Dokka's javadoc format
+// renders KDoc as real Javadoc-style HTML rather than shipping an empty placeholder jar.
+val dokkaJavadocJar by tasks.registering(Jar::class) {
+    dependsOn(tasks.named("dokkaGeneratePublicationJavadoc"))
+    from(layout.buildDirectory.dir("dokka/javadoc"))
+    archiveClassifier.set("javadoc")
+}
+
 publishing {
     publications {
         create<MavenPublication>("maven") {
             artifactId = "ksp-processor"
             from(components["java"])
+            artifact(dokkaJavadocJar)
 
             pom {
                 name.set("RoomQL KSP Processor")
@@ -83,5 +95,17 @@ publishing {
                 }
             }
         }
+    }
+}
+
+// Maven Central rejects unsigned artifacts. Signing only activates when the in-memory
+// key is present — set by the release workflow, absent for local publishToMavenLocal —
+// so local development and CI's build/test/publishToMavenLocal checks stay unaffected.
+val signingKey = System.getenv("ORG_GPG_KEY")
+val signingPassphrase = System.getenv("ORG_GPG_PASSPHRASE")
+if (signingKey != null && signingPassphrase != null) {
+    signing {
+        useInMemoryPgpKeys(signingKey, signingPassphrase)
+        sign(publishing.publications["maven"])
     }
 }
