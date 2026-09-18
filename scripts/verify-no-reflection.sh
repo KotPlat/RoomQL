@@ -14,11 +14,11 @@
 # Scans the real published artifacts rather than build output, so it checks what users
 # actually resolve.
 #
-# Usage: scripts/verify-no-reflection.sh [version]     (default: 1.0.0)
+# Usage: scripts/verify-no-reflection.sh [version]     (default: 2.0.0)
 
 set -euo pipefail
 
-VERSION="${1:-1.0.0}"
+VERSION="${1:-2.0.0}"
 REPO="${HOME}/.m2/repository/com/github/ahmednobii/RoomQL"
 
 RUNTIME_JAR="${REPO}/roomql-runtime/${VERSION}/roomql-runtime-${VERSION}.jar"

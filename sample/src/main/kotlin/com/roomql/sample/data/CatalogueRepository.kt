@@ -31,10 +31,10 @@ class CatalogueRepository(
         val q = query {
             from(ProductEntityTable)
             where {
-                ProductEntityTable.category eq category
-                ProductEntityTable.price gte minPrice
-                ProductEntityTable.rating gte minRating
-                ProductEntityTable.inStock eq inStockOnly
+                ProductEntityTable.category eqIfNotNull category
+                ProductEntityTable.price gteIfNotNull minPrice
+                ProductEntityTable.rating gteIfNotNull minRating
+                ProductEntityTable.inStock eqIfNotNull inStockOnly
             }
             orderBy(ProductEntityTable.rating, SortDirection.DESC)
         }
@@ -44,7 +44,7 @@ class CatalogueRepository(
     suspend fun searchSuspend(category: String?): List<ProductEntity> {
         val q = query {
             from(ProductEntityTable)
-            where { ProductEntityTable.category eq category }
+            where { ProductEntityTable.category eqIfNotNull category }
         }
         return productDao.searchSuspend(q.toQuery())
     }
@@ -56,7 +56,7 @@ class CatalogueRepository(
     fun byCategories(categories: List<String>?): List<ProductEntity> {
         val q = query {
             from(ProductEntityTable)
-            where { ProductEntityTable.category inList categories }
+            where { ProductEntityTable.category inListIfNotEmpty categories }
         }
         return productDao.search(q.toQuery())
     }
@@ -73,8 +73,8 @@ class CatalogueRepository(
                 on { ProductEntityTable.brandId eq BrandEntityTable.id }
             }
             where {
-                ProductEntityTable.category eq category
-                BrandEntityTable.country eq country
+                ProductEntityTable.category eqIfNotNull category
+                BrandEntityTable.country eqIfNotNull country
             }
         }
         return productDao.searchWithBrand(q.toQuery())
@@ -94,8 +94,8 @@ class CatalogueRepository(
                 on { ProductEntityTable.brandId eq BrandEntityTable.id }
             }
             where {
-                ProductEntityTable.category inList categories
-                BrandEntityTable.country eq country
+                ProductEntityTable.category inListIfNotEmpty categories
+                BrandEntityTable.country eqIfNotNull country
             }
             orderBy(ProductEntityTable.name, SortDirection.ASC)
         }
@@ -123,7 +123,7 @@ class CatalogueRepository(
     fun observeByName(fragment: String?): Flow<List<ProductEntity>> {
         val q = query {
             from(ProductEntityTable)
-            where { ProductEntityTable.name contains fragment }
+            where { ProductEntityTable.name containsIfNotNull fragment }
             orderBy(ProductEntityTable.name, SortDirection.ASC)
         }
         return productDao.observe(q.toQuery())

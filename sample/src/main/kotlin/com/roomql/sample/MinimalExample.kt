@@ -85,8 +85,8 @@ fun findNotes(dao: NoteDao, titleFragment: String?, archived: Boolean?): List<No
     val q = query {
         from(NoteEntityTable)
         where {
-            NoteEntityTable.title contains titleFragment
-            NoteEntityTable.archived eq archived
+            NoteEntityTable.title containsIfNotNull titleFragment
+            NoteEntityTable.archived eqIfNotNull archived
         }
         orderBy(NoteEntityTable.title, SortDirection.ASC)
     }

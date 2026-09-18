@@ -59,14 +59,29 @@ class QueryBuilderTest {
     }
 
     @Test
-    fun `null value skips eq condition`() {
+    fun `null value skips eqIfNotNull condition`() {
         val age: Int? = null
         val result = query {
             from("users")
-            where { Column<Int>("age", "users") eq age }
+            where { Column<Int>("age", "users") eqIfNotNull age }
         }
         assertEquals("SELECT * FROM users", result.sql)
         assertEquals(0, result.args.size)
+    }
+
+    @Test
+    fun `eq rejects a null that reaches it through erasure`() {
+        // T & Any stops an ordinary nullable Kotlin variable at compile time. This is the
+        // path around that: a null crossing an erased generic boundary, as a Java caller
+        // or an unchecked cast would produce. Kotlin's own compiled-in parameter check
+        // catches it — a NullPointerException, not a RoomQlException — but it still fails
+        // immediately rather than silently binding NULL and matching no rows.
+        assertFailsWith<NullPointerException> {
+            query {
+                from("users")
+                where { Column<String>("name", "users") eq erasedNull() }
+            }
+        }
     }
 
     // --- WHERE: gt / gte / lt / lte ---
@@ -182,20 +197,32 @@ class QueryBuilderTest {
     }
 
     @Test
-    fun `null inList skips condition`() {
+    fun `null inListIfNotEmpty skips condition`() {
         val ids: List<Int>? = null
         val result = query {
             from("users")
-            where { Column<Int>("role_id", "users") inList ids }
+            where { Column<Int>("role_id", "users") inListIfNotEmpty ids }
         }
         assertEquals("SELECT * FROM users", result.sql)
     }
 
     @Test
-    fun `empty inList skips condition`() {
+    fun `empty inList renders IN () rather than skipping`() {
+        // The required form translates faithfully. SQLite defines IN () as matching
+        // nothing, which is a real meaning a caller may want; skipping is the job of
+        // inListIfNotEmpty below.
         val result = query {
             from("users")
             where { Column<Int>("role_id", "users") inList emptyList() }
+        }
+        assertEquals("SELECT * FROM users WHERE role_id IN ()", result.sql)
+    }
+
+    @Test
+    fun `empty inListIfNotEmpty skips condition`() {
+        val result = query {
+            from("users")
+            where { Column<Int>("role_id", "users") inListIfNotEmpty emptyList() }
         }
         assertEquals("SELECT * FROM users", result.sql)
     }
@@ -213,12 +240,20 @@ class QueryBuilderTest {
     }
 
     @Test
-    fun `between with null lower skips condition`() {
+    fun `a half-open range keeps the bound that was supplied`() {
+        // between requires both bounds, so an open-ended range is composed from the
+        // optional comparisons. The supplied bound survives instead of the whole
+        // condition being dropped, which is what the old skipping between() did.
+        val lower: Int? = null
         val result = query {
             from("users")
-            where { Column<Int>("age", "users").between(null, 65) }
+            where {
+                Column<Int>("age", "users") gteIfNotNull lower
+                Column<Int>("age", "users") lteIfNotNull 65
+            }
         }
-        assertEquals("SELECT * FROM users", result.sql)
+        assertEquals("SELECT * FROM users WHERE age <= ?", result.sql)
+        assertEquals(listOf(65), result.args)
     }
 
     // --- WHERE: AND combinator (default) ---
@@ -590,3 +625,7 @@ class QueryBuilderTest {
         assertEquals(listOf(18, "active"), result.args.toList())
     }
 }
+
+/** Delivers a null across an erased generic boundary, as a Java platform type would. */
+@Suppress("UNCHECKED_CAST")
+private fun <T> erasedNull(): T = null as T

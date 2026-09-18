@@ -2,10 +2,13 @@ package com.roomql.sample
 
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.roomql.android.toQuery
+import com.roomql.runtime.query
 import com.roomql.sample.data.AppDatabase
 import com.roomql.sample.data.CatalogueRepository
 import com.roomql.sample.data.CatalogueSeed
 import com.roomql.sample.data.ProductEntity
+import com.roomql.sample.data.ProductEntityTable
 import com.roomql.sample.data.SortColumn
 import com.roomql.runtime.SortDirection
 import kotlinx.coroutines.flow.first
@@ -84,6 +87,25 @@ class CatalogueRepositoryTest {
     fun `suspend variant runs`() = runBlocking {
         val cameras = repository.searchSuspend("Cameras")
         assertTrue(cameras.all { it.category == "Cameras" })
+    }
+
+    @Test
+    fun `required inList on an empty list executes IN () against real SQLite`() {
+        // inListIfNotEmpty's skip-on-empty behaviour is asserted above via byCategories.
+        // The required inList takes a different path deliberately: it renders a literal
+        // IN () / NOT IN () rather than skipping, and that SQL needs to actually run
+        // against SQLite once, not just be asserted as a string in :runtime.
+        val none = query {
+            from(ProductEntityTable)
+            where { ProductEntityTable.category inList emptyList() }
+        }
+        assertEquals(0, db.productDao().search(none.toQuery()).size)
+
+        val all = query {
+            from(ProductEntityTable)
+            where { ProductEntityTable.category notInList emptyList() }
+        }
+        assertEquals(CatalogueSeed.PRODUCT_COUNT, db.productDao().search(all.toQuery()).size)
     }
 
     @Test

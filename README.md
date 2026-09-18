@@ -36,7 +36,7 @@ Room has no good answer for a query whose filters are decided at runtime. Write 
 
 ## Installation
 
-RoomQL 1.0.0 publishes through JitPack. Add the repository in `settings.gradle.kts`:
+RoomQL 2.0.0 publishes through JitPack. Add the repository in `settings.gradle.kts`:
 
 ```kotlin
 dependencyResolutionManagement {
@@ -52,7 +52,7 @@ Then declare the three artifacts (version catalog form, `gradle/libs.versions.to
 
 ```toml
 [versions]
-roomql = "1.0.0"
+roomql = "2.0.0"
 
 [libraries]
 roomql-runtime         = { module = "com.github.ahmednobii.RoomQL:roomql-runtime",         version.ref = "roomql" }
@@ -115,8 +115,8 @@ fun searchUsers(dao: UserDao, minAge: Int?, status: String?): List<UserEntity> {
     val q = query {
         from(UserEntityTable)
         where {
-            UserEntityTable.age gte minAge      // dropped from the SQL when minAge is null
-            UserEntityTable.status eq status    // dropped from the SQL when status is null
+            UserEntityTable.age gteIfNotNull minAge      // dropped from the SQL when minAge is null
+            UserEntityTable.status eqIfNotNull status    // dropped from the SQL when status is null
         }
         orderBy(UserEntityTable.age, SortDirection.DESC)
         limit(20)
@@ -134,7 +134,7 @@ No `if` ladders, no `IS NULL OR` trick, and `UserEntityTable.age` is a real Kotl
 ## What you get
 
 - **Compile-time safety on column references.** `UserEntityTable.age` is generated from your entity by KSP. Renames and typos fail the build instead of the query.
-- **Nullable filters that disappear.** A `null` value drops that condition from the SQL entirely.
+- **Optional filters that disappear, and say so.** `age gteIfNotNull minAge` drops the condition from the SQL when `minAge` is null; the plain `age gte minAge` is required and will not compile with a nullable value. Reading the operator name tells you which one you have.
 - **A real DSL, not string concatenation.** `where`, `or { }`, `orderBy`, `limit`/`offset`, `groupBy`/`having`, `join`. Values are bound as positional `?` parameters, so there is no injection surface.
 - **Automatic JOIN column aliasing.** Colliding column names across joined tables are aliased (`users.id AS users__id`) so a cursor never silently overwrites one column with another.
 - **Works with Room's own `@RawQuery`.** The output is a plain `SupportSQLiteQuery`. Blocking, `suspend`, and `Flow` return types all work — Room does the rest.
@@ -161,10 +161,13 @@ RoomQL's entire public surface, across all three artifacts. Signatures, generic 
 | [`query { }`](docs/API.md#query) | runtime | Entry point. Builds and returns a `RoomQlQuery`. |
 | [`QueryBuilder`](docs/API.md#querybuilder) | runtime | Receiver inside `query { }`: `from`, `join`, `where`, `groupBy`, `having`, `orderBy`, `limit`, `offset`, `build`. |
 | [`ConditionScope`](docs/API.md#conditionscope-the-condition-operators) | runtime | Receiver inside `where { }` / `having { }`. Carries every operator below, plus `or { }` for alternatives. |
-| `eq`, `notEq`, `gt`, `gte`, `lt`, `lte` | runtime | Comparisons. Each skips itself when the value is `null`. |
-| `like`, `notLike`, `contains` | runtime | Text matching on `String` columns. `contains` adds the `%` wildcards for you. |
-| `inList`, `notInList` | runtime | Set membership. Skips when the list is `null` or empty. |
-| `between` | runtime | Range. Skips when either bound is `null`. |
+| `eq`, `notEq`, `gt`, `gte`, `lt`, `lte` | runtime | Comparisons. Required — a nullable value will not compile. |
+| `eqIfNotNull`, `notEqIfNotNull`, `gtIfNotNull`, `gteIfNotNull`, `ltIfNotNull`, `lteIfNotNull` | runtime | The optional forms. Skip when the value is `null`. |
+| `like`, `notLike`, `contains` | runtime | Text matching on `String` columns. Required. `contains` adds the `%` wildcards for you. |
+| `likeIfNotNull`, `notLikeIfNotNull`, `containsIfNotNull` | runtime | The optional forms. Skip when the value is `null`. |
+| `inList`, `notInList` | runtime | Set membership. Required — an empty list renders `IN ()`, which SQLite defines as matching nothing. |
+| `inListIfNotEmpty`, `notInListIfNotEmpty` | runtime | The optional forms. Skip when the list is `null` or empty. |
+| `between` | runtime | Range. Both bounds required — compose `gteIfNotNull` + `lteIfNotNull` for a half-open range. |
 | `isNull`, `isNotNull` | runtime | SQL `NULL` checks — the two operators that never skip. |
 | [`Column<T>`](docs/API.md#column) | runtime | A typed column reference. Generated per entity property, never hand-written. |
 | [`EntityTable`](docs/API.md#entitytable) | runtime | Implemented by every generated `*Table`: `tableName`, `allColumnNames`. |
@@ -191,11 +194,11 @@ RoomQL's entire public surface, across all three artifacts. Signatures, generic 
 
 ### Does RoomQL replace Room?
 
-No. RoomQL 1.0.0 sits on top of Room and produces the `SupportSQLiteQuery` that Room's own `@RawQuery` methods take. You keep your `@Entity` classes, your `@Database`, your DAOs, and your migrations exactly as they are — RoomQL only replaces the SQL string for queries whose filters vary at runtime.
+No. RoomQL sits on top of Room and produces the `SupportSQLiteQuery` that Room's own `@RawQuery` methods take. You keep your `@Entity` classes, your `@Database`, your DAOs, and your migrations exactly as they are — RoomQL only replaces the SQL string for queries whose filters vary at runtime.
 
 ### How do I build a Room query with optional filters in Kotlin?
 
-Wrap the filters in RoomQL's `query { }` block and pass the nullable values straight in: `where { UserEntityTable.age gte minAge }` emits `age >= ?` when `minAge` has a value and emits nothing at all when it is `null`. There is no `if` ladder and no `(:minAge IS NULL OR age >= :minAge)` trick, because the condition is never added to the SQL in the first place.
+Wrap the filters in RoomQL's `query { }` block and use the `IfNotNull` operators for the ones that are optional: `where { UserEntityTable.age gteIfNotNull minAge }` emits `age >= ?` when `minAge` has a value and emits nothing at all when it is `null`. The plain `gte` requires a non-null value and will not compile against a nullable one — that split is what makes a `where { }` block tell you which of its conditions can disappear, just by reading the operator names. There is no `if` ladder and no `(:minAge IS NULL OR age >= :minAge)` trick, because the condition is never added to the SQL in the first place.
 
 ### Does RoomQL use reflection or runtime code generation?
 
@@ -211,11 +214,11 @@ The DSL (`roomql-runtime`) is a pure-JVM module with no Android dependency, whic
 
 ### Does RoomQL work with Kotlin Multiplatform?
 
-Not in 1.0.0. `roomql-runtime` is a plain JVM module (not a KMP source set), and `roomql-runtime-android` depends on `androidx.sqlite`. RoomQL targets Android and JVM projects that use Room.
+Not yet. `roomql-runtime` is a plain JVM module (not a KMP source set), and `roomql-runtime-android` depends on `androidx.sqlite`. RoomQL targets Android and JVM projects that use Room.
 
 ### Does RoomQL support KAPT?
 
-No — RoomQL 1.0.0 ships a KSP processor only, so your module needs the `com.google.devtools.ksp` plugin and `ksp(libs.roomql.ksp.processor)`. Room itself can still run on KAPT in the same module if you have not migrated it yet.
+No — RoomQL ships a KSP processor only, so your module needs the `com.google.devtools.ksp` plugin and `ksp(libs.roomql.ksp.processor)`. Room itself can still run on KAPT in the same module if you have not migrated it yet.
 
 ### Why doesn't my `Flow` re-emit when the table changes?
 
@@ -229,7 +232,7 @@ Only the column references. RoomQL's KSP processor makes `UserEntityTable.age` a
 
 Know these before adopting:
 
-- **Nullable-skipping cuts both ways.** Passing `null` *removes* the condition; it does not mean “match `NULL`”. Use `isNull()` for that. A `null` filter can silently return more rows than you expect.
+- **`IfNotNull` removes the condition — it does not mean "match `NULL`".** `status eqIfNotNull null` drops the filter; it is not `status IS NULL`. Use `isNull()` for that. The plain operators (`eq`, `gte`, …) will not compile against a nullable value at all, so this can only surprise you on the operator you asked to skip.
 - **No compile-time SQL validation of the whole query.** Column references are checked; query logic is not. See the FAQ above.
 - **JOIN results need matching `@ColumnInfo` names.** Colliding columns are aliased to `table__column`; your result class must use those exact names or the field will not map.
 - **`Flow` `observedEntities` is manual.** Get it wrong and the `Flow` will not re-emit.
@@ -249,7 +252,7 @@ Know these before adopting:
 | [`:runtime-android`](runtime-android) | `roomql-runtime-android` | `RoomQlQuery.toQuery()` → `SupportSQLiteQuery` |
 | [`:ksp-processor`](ksp-processor) | `roomql-ksp-processor` | generates the `*Table` objects from `@Entity` |
 
-> **On annotation-driven integration.** RoomQL 1.0.0 uses Room's manual `@RawQuery`: you declare the method, build with `query { }`, and pass `.toQuery()`. A zero-boilerplate annotation-driven integration was explored and dropped — KSP cannot read function bodies, so it could not infer the query or `observedEntities`. That work lives on the `development` branch and is tracked for v2 in issues [#6](https://github.com/ahmednobii/RoomQL/issues/6) and [#13](https://github.com/ahmednobii/RoomQL/issues/13). v1 ships no annotation artifact.
+> **On annotation-driven integration.** RoomQL uses Room's manual `@RawQuery`: you declare the method, build with `query { }`, and pass `.toQuery()`. A zero-boilerplate annotation-driven integration was explored and dropped — KSP cannot read function bodies, so it could not infer the query or `observedEntities`. That exploration lives on the `development` branch and is tracked in issues [#6](https://github.com/ahmednobii/RoomQL/issues/6) and [#13](https://github.com/ahmednobii/RoomQL/issues/13). No release ships an annotation artifact yet.
 
 ## Contributing and support
 

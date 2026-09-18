@@ -1,6 +1,6 @@
 # RoomQL Usage Guide — building dynamic Android Room queries in Kotlin
 
-Every operator in the **RoomQL 1.0.0** DSL, the SQL each one generates, and the idioms for joins, `Flow`, error handling, and testing. For the pitch, installation, API reference, and limitations, see the [main README](../README.md).
+Every operator in the **RoomQL 2.0.0** DSL, the SQL each one generates, and the idioms for joins, `Flow`, error handling, and testing. For the pitch, installation, API reference, and limitations, see the [main README](../README.md).
 
 RoomQL is a type-safe Kotlin DSL that builds a Room `@RawQuery` at runtime, so a search screen whose filters are chosen by the user needs neither `(:minAge IS NULL OR age >= :minAge)` string tricks nor one DAO method per filter combination. This guide assumes you have added the three artifacts — `roomql-runtime`, `roomql-runtime-android`, and `roomql-ksp-processor` — as shown in the [installation section](../README.md#installation).
 
@@ -212,16 +212,25 @@ An `or { }` block whose conditions all skip contributes nothing — no empty `()
 
 ---
 
-## Optional filters: how null values drop out of the SQL
+## Optional filters: two operators for two intents
 
-This is the feature RoomQL exists for. Every RoomQL operator that takes a value accepts a **nullable** one, and emits nothing at all when that value is `null` — so a filter the user left blank is simply absent from the generated SQL, with no `if` ladder and no `(:minAge IS NULL OR age >= :minAge)` trick.
+This is the feature RoomQL exists for, and it works through a deliberate split rather than one operator that does both jobs.
+
+**The plain operator is required.** `eq`, `gte`, `like`, and the rest take a non-nullable value. Pass a nullable Kotlin variable and it will not compile:
+
+```kotlin
+val status: String? = maybeStatus()
+UserEntityTable.status eq status   // compile error: String? is not String
+```
+
+**The `IfNotNull` operator is optional.** It takes the nullable value and skips the condition — leaves it out of the SQL entirely — when that value is `null`:
 
 ```kotlin
 fun searchUsers(minAge: Int?, status: String?) = query {
     from(UserEntityTable)
     where {
-        UserEntityTable.age gte minAge       // dropped when minAge == null
-        UserEntityTable.status eq status     // dropped when status == null
+        UserEntityTable.age gteIfNotNull minAge       // dropped when minAge == null
+        UserEntityTable.status eqIfNotNull status     // dropped when status == null
     }
 }
 ```
@@ -235,33 +244,53 @@ One function, four different queries:
 | `searchUsers(null, "active")` | `SELECT * FROM users WHERE status = ?` | `["active"]` |
 | `searchUsers(null, null)` | `SELECT * FROM users` | `[]` |
 
-> ⚠️ **`null` means "skip this condition", not "match NULL".** Passing `null` widens the result set rather than narrowing it. To match SQL `NULL`, use `isNull()`, which never skips.
+**Why two operators rather than one that infers your intent from the value's type.** A single `eq` accepting `T?` cannot tell "this value happens to be null right now" from "I want to match SQL `NULL`" — both compile to the same call. Splitting the name makes the ambiguity impossible to write: `eqIfNotNull` can only mean "optional", `eq` can only mean "required", and `isNull()` is the only spelling of "match `NULL`". Reading a `where { }` block tells you which conditions can disappear without tracing the nullability of every variable at the call site.
+
+> ⚠️ **`IfNotNull` means "skip this condition", not "match NULL".** `status eqIfNotNull null` widens the result set rather than narrowing it — it does not become `status IS NULL`. Use `isNull()` for that.
+
+Every SQL comparison against `NULL` is false, including ones you might expect to be true — `age <> NULL` matches nothing, the same as `age = NULL`. A required operator can therefore never usefully accept `null`: there is no query it could produce that means anything, so RoomQL does not let you write one.
 
 ---
 
 ## Operator reference: every condition RoomQL generates
 
-These operators are available inside `where { }` and `having { }`. Each one takes a nullable value and skips itself when that value is `null`, except `isNull` and `isNotNull`, which never skip.
+Every value-taking operator below has two forms. The plain form is required — its value must be non-null, checked at compile time. The `IfNotNull` (or `IfNotEmpty`, for lists) form is optional and skips itself when the value is absent. `isNull` and `isNotNull` are the exception: they take no value and never skip.
 
 ### Comparisons
 
 ```kotlin
-UserEntityTable.age eq 30          // age = ?
-UserEntityTable.age notEq 30       // age != ?
-UserEntityTable.age gt 18          // age > ?
-UserEntityTable.age gte 18         // age >= ?
-UserEntityTable.age lt 65          // age < ?
-UserEntityTable.age lte 65         // age <= ?
+UserEntityTable.age eq 30                     // age = ?
+UserEntityTable.age eqIfNotNull minAge        // age = ?, or skipped
+
+UserEntityTable.age notEq 30                  // age != ?
+UserEntityTable.age notEqIfNotNull minAge     // age != ?, or skipped
+
+UserEntityTable.age gt 18                     // age > ?
+UserEntityTable.age gtIfNotNull minAge        // age > ?, or skipped
+
+UserEntityTable.age gte 18                    // age >= ?
+UserEntityTable.age gteIfNotNull minAge       // age >= ?, or skipped
+
+UserEntityTable.age lt 65                     // age < ?
+UserEntityTable.age ltIfNotNull maxAge        // age < ?, or skipped
+
+UserEntityTable.age lte 65                    // age <= ?
+UserEntityTable.age lteIfNotNull maxAge       // age <= ?, or skipped
 ```
 
 ### Text matching
 
-`like` and `notLike` take the SQL pattern verbatim, so you place the wildcards. `contains` writes them for you. All three are restricted to `String` columns, so they cannot be applied to a numeric column by mistake.
+`like` and `notLike` take the SQL pattern verbatim, so you place the wildcards. `contains` writes them for you. All are restricted to `String` columns, so they cannot be applied to a numeric column by mistake.
 
 ```kotlin
-UserEntityTable.name like "A%"        // name LIKE ?         args: ["A%"]
-UserEntityTable.name notLike "A%"     // name NOT LIKE ?     args: ["A%"]
-UserEntityTable.name contains "ali"   // name LIKE ?         args: ["%ali%"]
+UserEntityTable.name like "A%"                 // name LIKE ?         args: ["A%"]
+UserEntityTable.name likeIfNotNull pattern      // name LIKE ?, or skipped
+
+UserEntityTable.name notLike "A%"              // name NOT LIKE ?     args: ["A%"]
+UserEntityTable.name notLikeIfNotNull pattern   // name NOT LIKE ?, or skipped
+
+UserEntityTable.name contains "ali"            // name LIKE ?         args: ["%ali%"]
+UserEntityTable.name containsIfNotNull query    // name LIKE ?, or skipped
 ```
 
 ### Sets
@@ -270,20 +299,32 @@ UserEntityTable.name contains "ali"   // name LIKE ?         args: ["%ali%"]
 UserEntityTable.status inList listOf("active", "pending")
 // status IN (?,?)   args: ["active", "pending"]
 
+UserEntityTable.status inListIfNotEmpty selectedStatuses
+// status IN (?,?), or skipped if selectedStatuses is null or empty
+
 UserEntityTable.status notInList listOf("banned")
 // status NOT IN (?)  args: ["banned"]
+
+UserEntityTable.status notInListIfNotEmpty excludedStatuses
+// status NOT IN (?), or skipped if excludedStatuses is null or empty
 ```
 
-`inList` and `notInList` skip when the list is `null` **or empty** — an empty list means "no filter", never "match nothing".
+The optional forms are named for **emptiness**, not nullability, because an empty list has to skip too — a multi-select chip screen with nothing chosen means "no filter", not "match nothing". This is also why they are not simply `inList` accepting a nullable list: the required `inList` renders an empty list as `IN ()`, which SQLite defines as matching **nothing** — a real meaning some callers want, and one that skipping would take away from them. `notInList` is the asymmetric case to know: `NOT IN ()` matches **everything**, so the two required forms do not mirror each other on an empty list even though their `IfNotEmpty` counterparts behave the same way (skip).
 
 ### Ranges
 
 ```kotlin
 UserEntityTable.age.between(18, 65)     // age BETWEEN ? AND ?   args: [18, 65]
-UserEntityTable.age.between(18, null)   // skipped: upper bound is null
 ```
 
-`between` skips if **either** bound is `null`. For an open-ended range, use `gte` or `lte` alone — each skips independently.
+Both bounds are required, and there is no `betweenIfNotNull`. A range missing one bound is not a range — skipping the whole condition would silently drop the bound you did supply, which is worse than requiring both. Compose an open-ended range from the two comparisons instead:
+
+```kotlin
+UserEntityTable.price gteIfNotNull minPrice
+UserEntityTable.price lteIfNotNull maxPrice
+```
+
+This applies whichever bound is present, both, one, or neither, with no hidden case.
 
 ### Null checks
 
@@ -292,15 +333,17 @@ UserEntityTable.status.isNull()      // status IS NULL
 UserEntityTable.status.isNotNull()   // status IS NOT NULL
 ```
 
-### Null-skipping summary
+These are how you match SQL `NULL` itself. They take no argument, so there is nothing to make optional.
 
-| Operator | Skips when |
-|---|---|
-| `eq`, `notEq`, `gt`, `gte`, `lt`, `lte` | value is `null` |
-| `like`, `notLike`, `contains` | value is `null` |
-| `inList`, `notInList` | list is `null` or empty |
-| `between` | either bound is `null` |
-| `isNull`, `isNotNull` | never |
+### Required vs. optional summary
+
+| Operator | Required form | Optional form | Optional form skips when |
+|---|---|---|---|
+| Equality / comparison | `eq`, `notEq`, `gt`, `gte`, `lt`, `lte` | `eqIfNotNull`, `notEqIfNotNull`, `gtIfNotNull`, `gteIfNotNull`, `ltIfNotNull`, `lteIfNotNull` | value is `null` |
+| Text matching | `like`, `notLike`, `contains` | `likeIfNotNull`, `notLikeIfNotNull`, `containsIfNotNull` | value is `null` |
+| Set membership | `inList`, `notInList` | `inListIfNotEmpty`, `notInListIfNotEmpty` | list is `null` or empty |
+| Range | `between` | *(none — compose from `gteIfNotNull` + `lteIfNotNull`)* | — |
+| Null check | `isNull`, `isNotNull` | *(none — these already express optionality)* | never |
 
 ---
 
@@ -346,7 +389,7 @@ SELECT * FROM orders GROUP BY userId HAVING total > ?
 -- args: [100.0]
 ```
 
-`having { }` accepts exactly the same operators as `where { }`, including null-skipping, and requires `groupBy(...)` to be set or `build()` throws. RoomQL 1.0.0 groups by a **single** column and selects whole rows: there are no aggregate expressions (`COUNT`, `SUM`) and no multi-column `GROUP BY`. For those, a static Room `@Query` remains the right tool.
+`having { }` accepts exactly the same operators as `where { }` — required and `IfNotNull` forms both — and requires `groupBy(...)` to be set or `build()` throws. RoomQL groups by a **single** column and selects whole rows: there are no aggregate expressions (`COUNT`, `SUM`) and no multi-column `GROUP BY`. For those, a static Room `@Query` remains the right tool.
 
 ---
 
@@ -469,7 +512,7 @@ try {
 }
 ```
 
-Every case that throws:
+Every case that throws `RoomQlException`:
 
 | Mistake | Message |
 |---|---|
@@ -480,6 +523,8 @@ Every case that throws:
 | `join()` after a raw-string `from(String)` | `join() requires from(EntityTable) so columns can be aliased; from(String) has no column metadata` |
 
 These are programming errors rather than user input errors, so they are unchecked by design: a query that is wrong is wrong on every run, and will fail the first time the code path executes.
+
+**A required operator given `null` fails differently.** `eq`, `gte`, and the other required operators take a non-null value, so an ordinary nullable Kotlin variable will not compile against them at all — that mistake never reaches you at runtime. The one path around the type system is a `null` crossing an erased generic boundary: a Java caller, or an unchecked cast. RoomQL's own compiled bytecode carries Kotlin's standard non-null parameter check for that case, so it still fails immediately — a `NullPointerException`, not a `RoomQlException` — rather than silently binding `NULL` and matching zero rows. If you hit this, the fix is the same either way: use the `IfNotNull` (or `IfNotEmpty`) form for a value that can legitimately be absent.
 
 ---
 
@@ -502,8 +547,8 @@ class UserRepository(
         val q = query {
             from(UserEntityTable)
             where {
-                UserEntityTable.age gte minAge
-                UserEntityTable.status eq status
+                UserEntityTable.age gteIfNotNull minAge
+                UserEntityTable.status eqIfNotNull status
             }
             orderBy(UserEntityTable.age, SortDirection.DESC)
             limit(50)
@@ -514,7 +559,7 @@ class UserRepository(
     suspend fun findByStatus(status: String?): List<UserEntity> {
         val q = query {
             from(UserEntityTable)
-            where { UserEntityTable.status eq status }
+            where { UserEntityTable.status eqIfNotNull status }
         }
         return userDao.searchSuspend(q.toQuery())
     }
@@ -548,11 +593,12 @@ Because `query { }` returns a plain `RoomQlQuery` from a pure-JVM module, you ca
 ```kotlin
 @Test
 fun `null status is omitted`() {
+    val status: String? = null
     val q = query {
         from(UserEntityTable)
         where {
             UserEntityTable.age gte 18
-            UserEntityTable.status eq null
+            UserEntityTable.status eqIfNotNull status
         }
     }
     assertEquals("SELECT * FROM users WHERE age >= ?", q.sql)
@@ -588,7 +634,7 @@ Three ship with RoomQL, aimed at different moments.
 
 ### Why does my RoomQL query return more rows than expected?
 
-A `null` filter value removes its condition from the SQL instead of matching `NULL`, so `status eq null` in RoomQL 1.0.0 produces no `WHERE` clause at all rather than `WHERE status IS NULL`. If a filter appears to be ignored, check whether the value reaching it is `null` — and use `isNull()` when you actually want to match SQL `NULL`.
+An `IfNotNull` filter value removes its condition from the SQL instead of matching `NULL`, so `status eqIfNotNull null` produces no `WHERE` clause at all rather than `WHERE status IS NULL`. If a filter appears to be ignored, check whether the value reaching an `IfNotNull` operator is `null` — and use `isNull()` when you actually want to match SQL `NULL`. The plain `eq` cannot cause this: it does not compile against a nullable value in the first place.
 
 ### Why doesn't my Flow re-emit when the table changes?
 
