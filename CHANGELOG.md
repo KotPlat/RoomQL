@@ -8,6 +8,41 @@ All notable changes to **RoomQL** are documented here. The format follows
 
 _Nothing yet._
 
+## [2.0.0] - Unreleased
+
+### Changed — breaking
+
+- **Every value-taking condition operator splits into a required and an optional form.**
+  `eq`, `gte`, `like`, `inList`, `between`, and the rest now take `T & Any` and will not
+  compile against a nullable value. A new `IfNotNull` (`IfNotEmpty` for the two list
+  operators) suffix carries the old skip-on-null behaviour: `eqIfNotNull`, `gteIfNotNull`,
+  `likeIfNotNull`, `containsIfNotNull`, `inListIfNotEmpty`, `notInListIfNotEmpty`, and so on.
+  `isNull`/`isNotNull` are unchanged.
+
+  **Why:** `eq(value)` accepting a nullable value made every `where { }` block ambiguous —
+  reading `col eq x` could not tell you whether `x` going `null` was expected to narrow the
+  query or silently widen it. Splitting the name makes that visible at the call site instead
+  of requiring a reader to trace the nullability of every variable. Reported by a community
+  reviewer comparing against KtMongo's optional-filter design; see #57 for the full case,
+  including four verified queries where the old behaviour silently returned every row.
+
+  **Migration:** a compile error at each affected call site names exactly what changed.
+  Replace `col eq value` with `col eq value!!` if `value` is provably non-null, or with
+  `col eqIfNotNull value` if the filter is genuinely optional — the same replacement shape
+  applies to every operator in the table above. There is no deprecation period: 1.0.0 has no
+  known adopters, so this ships as a clean break rather than carrying two meanings for one
+  name across two releases.
+
+- **`between` requires both bounds** (`T & Any`, not `T?`) and has no `IfNotNull` form. A
+  range with one bound missing was not a range; skipping the whole condition on the old
+  `between(null, upper)` silently dropped the bound that *was* supplied. Compose an
+  open-ended range from `gteIfNotNull` + `lteIfNotNull` instead.
+
+- **`inList`/`notInList` on an empty list now render `IN ()` / `NOT IN ()`** rather than
+  skipping — SQLite defines `IN ()` as matching nothing and `NOT IN ()` as matching
+  everything, both real conditions a caller may want. Skipping on an empty *or* null list is
+  now `inListIfNotEmpty`/`notInListIfNotEmpty`.
+
 ## [1.0.0] — 2026-09-13
 
 First stable release. Three artifacts, published on JitPack:

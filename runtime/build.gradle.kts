@@ -46,7 +46,7 @@ publishing {
 
             pom {
                 name.set("RoomQL Runtime")
-                description.set("Type-safe Kotlin DSL for building dynamic Android Room queries at runtime: the query { } builder, typed Column references, and null-skipping conditions. Pure JVM, unit-testable without an emulator.")
+                description.set("Type-safe Kotlin DSL for building dynamic Android Room queries at runtime: the query { } builder, typed Column references, and required/IfNotNull condition pairs for filters that can disappear. Pure JVM, unit-testable without an emulator.")
                 url.set("https://github.com/ahmednobii/RoomQL")
                 inceptionYear.set("2026")
 

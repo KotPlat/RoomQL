@@ -30,10 +30,10 @@ class RoomQlSearch(private val dao: ProductDao) : SearchStrategy {
         query {
             from(ProductEntityTable)
             where {
-                ProductEntityTable.category eq filters.category
-                ProductEntityTable.price gte filters.minPrice
-                ProductEntityTable.rating gte filters.minRating
-                ProductEntityTable.inStock eq filters.inStockOnly
+                ProductEntityTable.category eqIfNotNull filters.category
+                ProductEntityTable.price gteIfNotNull filters.minPrice
+                ProductEntityTable.rating gteIfNotNull filters.minRating
+                ProductEntityTable.inStock eqIfNotNull filters.inStockOnly
             }
             orderBy(ProductEntityTable.rating, SortDirection.DESC)
             orderBy(ProductEntityTable.id, SortDirection.ASC)
@@ -44,10 +44,10 @@ class RoomQlSearch(private val dao: ProductDao) : SearchStrategy {
         val q = query {
             from(ProductEntityTable)
             where {
-                ProductEntityTable.category eq filters.category
-                ProductEntityTable.price gte filters.minPrice
-                ProductEntityTable.rating gte filters.minRating
-                ProductEntityTable.inStock eq filters.inStockOnly
+                ProductEntityTable.category eqIfNotNull filters.category
+                ProductEntityTable.price gteIfNotNull filters.minPrice
+                ProductEntityTable.rating gteIfNotNull filters.minRating
+                ProductEntityTable.inStock eqIfNotNull filters.inStockOnly
             }
             orderBy(ProductEntityTable.rating, SortDirection.DESC)
             orderBy(ProductEntityTable.id, SortDirection.ASC)

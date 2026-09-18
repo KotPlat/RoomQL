@@ -1,6 +1,6 @@
 # RoomQL API Reference
 
-Every public type, function, and operator in **RoomQL 1.0.0** — the type-safe Kotlin DSL for building dynamic Android Room queries — with the SQL each one generates. For worked examples see the [Usage Guide](USAGE.md); for installation and the overall pitch see the [main README](../README.md).
+Every public type, function, and operator in **RoomQL 2.0.0** — the type-safe Kotlin DSL for building dynamic Android Room queries — with the SQL each one generates. For worked examples see the [Usage Guide](USAGE.md); for installation and the overall pitch see the [main README](../README.md).
 
 The public surface is deliberately small and is frozen by [Binary Compatibility Validator](https://github.com/Kotlin/binary-compatibility-validator), so everything RoomQL exposes is on this page.
 
@@ -66,26 +66,39 @@ The receiver inside `query { }`. Marked `@RoomQlDsl`, so outer-scope members can
 
 The receiver inside `where { }` and `having { }`. Every operator is an extension on `Column<T>`, so it registers itself in the enclosing scope automatically.
 
-**Every value-taking operator accepts a nullable value and emits nothing when it is `null`.** This is RoomQL's core contract: an absent filter is absent from the SQL, rather than matching `NULL`.
+**Every value-taking condition comes in a required and an optional form**, and the name tells you which is which. The required form takes `T & Any` — Kotlin's syntax for "definitely non-null `T`" — so passing a nullable value fails to compile. The optional form is suffixed `IfNotNull` (or `IfNotEmpty` for the two list operators) and takes `T?`, skipping the condition — leaving it out of the generated SQL — when the value is absent. `isNull` and `isNotNull` take no value and never skip; they are how you match SQL `NULL` itself.
 
-| Operator | Signature | Generated SQL | Skips when |
-|---|---|---|---|
-| `eq` | `infix fun <T> Column<T>.eq(value: T?)` | `col = ?` | value is `null` |
-| `notEq` | `infix fun <T> Column<T>.notEq(value: T?)` | `col != ?` | value is `null` |
-| `gt` | `infix fun <T> Column<T>.gt(value: T?)` | `col > ?` | value is `null` |
-| `gte` | `infix fun <T> Column<T>.gte(value: T?)` | `col >= ?` | value is `null` |
-| `lt` | `infix fun <T> Column<T>.lt(value: T?)` | `col < ?` | value is `null` |
-| `lte` | `infix fun <T> Column<T>.lte(value: T?)` | `col <= ?` | value is `null` |
-| `like` | `infix fun <T : String?> Column<T>.like(value: String?)` | `col LIKE ?` | value is `null` |
-| `notLike` | `infix fun <T : String?> Column<T>.notLike(value: String?)` | `col NOT LIKE ?` | value is `null` |
-| `contains` | `infix fun <T : String?> Column<T>.contains(value: String?)` | `col LIKE ?`, bound as `%value%` | value is `null` |
-| `inList` | `infix fun <T> Column<T>.inList(values: List<T>?)` | `col IN (?,?)` | list is `null` or empty |
-| `notInList` | `infix fun <T> Column<T>.notInList(values: List<T>?)` | `col NOT IN (?)` | list is `null` or empty |
-| `between` | `fun <T> Column<T>.between(lower: T?, upper: T?)` | `col BETWEEN ? AND ?` | either bound is `null` |
-| `isNull` | `fun <T> Column<T>.isNull()` | `col IS NULL` | never |
-| `isNotNull` | `fun <T> Column<T>.isNotNull()` | `col IS NOT NULL` | never |
+| Operator | Signature | Generated SQL |
+|---|---|---|
+| `eq` | `infix fun <T> Column<T>.eq(value: T & Any)` | `col = ?` |
+| `eqIfNotNull` | `infix fun <T> Column<T>.eqIfNotNull(value: T?)` | `col = ?`, or skipped |
+| `notEq` | `infix fun <T> Column<T>.notEq(value: T & Any)` | `col != ?` |
+| `notEqIfNotNull` | `infix fun <T> Column<T>.notEqIfNotNull(value: T?)` | `col != ?`, or skipped |
+| `gt` | `infix fun <T> Column<T>.gt(value: T & Any)` | `col > ?` |
+| `gtIfNotNull` | `infix fun <T> Column<T>.gtIfNotNull(value: T?)` | `col > ?`, or skipped |
+| `gte` | `infix fun <T> Column<T>.gte(value: T & Any)` | `col >= ?` |
+| `gteIfNotNull` | `infix fun <T> Column<T>.gteIfNotNull(value: T?)` | `col >= ?`, or skipped |
+| `lt` | `infix fun <T> Column<T>.lt(value: T & Any)` | `col < ?` |
+| `ltIfNotNull` | `infix fun <T> Column<T>.ltIfNotNull(value: T?)` | `col < ?`, or skipped |
+| `lte` | `infix fun <T> Column<T>.lte(value: T & Any)` | `col <= ?` |
+| `lteIfNotNull` | `infix fun <T> Column<T>.lteIfNotNull(value: T?)` | `col <= ?`, or skipped |
+| `like` | `infix fun <T : String?> Column<T>.like(value: String)` | `col LIKE ?` |
+| `likeIfNotNull` | `infix fun <T : String?> Column<T>.likeIfNotNull(value: String?)` | `col LIKE ?`, or skipped |
+| `notLike` | `infix fun <T : String?> Column<T>.notLike(value: String)` | `col NOT LIKE ?` |
+| `notLikeIfNotNull` | `infix fun <T : String?> Column<T>.notLikeIfNotNull(value: String?)` | `col NOT LIKE ?`, or skipped |
+| `contains` | `infix fun <T : String?> Column<T>.contains(value: String)` | `col LIKE ?`, bound as `%value%` |
+| `containsIfNotNull` | `infix fun <T : String?> Column<T>.containsIfNotNull(value: String?)` | `col LIKE ?`, bound as `%value%`, or skipped |
+| `inList` | `infix fun <T> Column<T>.inList(values: List<T & Any>)` | `col IN (?,?)`; an empty list renders `col IN ()`, which SQLite defines as matching nothing |
+| `inListIfNotEmpty` | `infix fun <T> Column<T>.inListIfNotEmpty(values: List<T & Any>?)` | `col IN (?,?)`, or skipped if the list is `null` or empty |
+| `notInList` | `infix fun <T> Column<T>.notInList(values: List<T & Any>)` | `col NOT IN (?)`; an empty list renders `col NOT IN ()`, which SQLite defines as matching everything |
+| `notInListIfNotEmpty` | `infix fun <T> Column<T>.notInListIfNotEmpty(values: List<T & Any>?)` | `col NOT IN (?)`, or skipped if the list is `null` or empty |
+| `between` | `fun <T> Column<T>.between(lower: T & Any, upper: T & Any)` | `col BETWEEN ? AND ?`. Both bounds required; no optional form — compose `gteIfNotNull` + `lteIfNotNull` for an open-ended range |
+| `isNull` | `fun <T> Column<T>.isNull()` | `col IS NULL` |
+| `isNotNull` | `fun <T> Column<T>.isNotNull()` | `col IS NOT NULL` |
 
 `like`, `notLike`, and `contains` are constrained to `String` columns (`T : String?`), so they cannot be applied to a numeric column. `like` and `notLike` take the SQL pattern verbatim; `contains` adds the `%` wildcards for you.
+
+**`T & Any` is a compile-time guarantee, not a runtime one.** Generics erase, so a `null` crossing an erased boundary — a Java caller, or an unchecked cast — is not stopped by the type at the JVM level. It is still caught: every operator above is a public function with a non-null parameter, so Kotlin compiles a `checkNotNullParameter` guard into `roomql-runtime`'s own bytecode, and such a call throws `NullPointerException` immediately rather than silently binding `NULL` into the arguments. `internal` and `private` functions do not get this guard by default; every operator here is `public`, so all of them do.
 
 #### or
 
@@ -154,7 +167,7 @@ public enum class JoinType { INNER, LEFT }
 public enum class SortDirection { ASC, DESC }
 ```
 
-`JoinType` renders as `INNER JOIN` or `LEFT JOIN`; RoomQL 1.0.0 supports no other join kinds. `SortDirection` renders as `ASC` or `DESC`.
+`JoinType` renders as `INNER JOIN` or `LEFT JOIN`; RoomQL supports no other join kinds. `SortDirection` renders as `ASC` or `DESC`.
 
 ### RoomQlException
 

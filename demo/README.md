@@ -11,10 +11,10 @@ This is a **standalone Gradle build**. It consumes RoomQL as published artifacts
 ./gradlew -p demo testDebugUnitTest
 ```
 
-Until RoomQL 1.0.0 is published on JitPack, build the library locally first — this is exactly what `jitpack.yml` runs when building a tag:
+Until RoomQL 2.0.0 is tagged and published on JitPack, build the library locally first — this is exactly what `jitpack.yml` runs when building a tag:
 
 ```bash
-VERSION=1.0.0 ./gradlew publishToMavenLocal
+VERSION=2.0.0 ./gradlew publishToMavenLocal
 ./gradlew -p demo assembleDebug
 ```
 
@@ -25,7 +25,7 @@ VERSION=1.0.0 ./gradlew publishToMavenLocal
 Open the **`demo/` directory itself** as the project (File -> Open -> select `demo/`), not the
 repository root. The demo is intentionally absent from the root `settings.gradle.kts`, so a root
 project window has no module owning `demo/src/**` and reds every import in it while `./gradlew -p
-demo build` still succeeds. Publish the library first (`VERSION=1.0.0 ./gradlew publishToMavenLocal`
+demo build` still succeeds. Publish the library first (`VERSION=2.0.0 ./gradlew publishToMavenLocal`
 from the root), then sync — otherwise `mavenLocal()` has nothing for the IDE to resolve.
 
 To work on the library and the demo in one window instead, add the demo as a second linked Gradle

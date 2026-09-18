@@ -3,7 +3,7 @@
 kotlin = "2.0.21"
 ksp = "2.0.21-1.0.28"
 agp = "8.11.1"
-roomql = "1.0.0"
+roomql = "2.0.0"
 room = "2.6.1"
 coroutines = "1.10.2"
 composeBom = "2024.09.00"

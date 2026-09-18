@@ -44,18 +44,26 @@ must pass.
 ./gradlew apiDump
 ```
 
-Commit the updated `*/api/*.api` files with your change. Review that diff — it is the clearest
-statement of what your PR does to the library's surface, and an unintended entry there is usually
-a missing `internal`.
+Commit the updated `*/api/*.api` files with your change. Review that diff for an unintended entry
+— that's usually a missing `internal` — but do not treat an *unchanged* diff as proof the change is
+source-compatible. The `.api` format is a JVM signature dump: `T & Any` and `T?` erase to the same
+`Ljava/lang/Object;`, so a change that only tightens or loosens nullability, or narrows a generic
+bound, produces no diff here at all while still breaking every caller who passes the case you
+removed. `apiCheck` passing is evidence of binary compatibility, not source compatibility — treat
+any nullability or generic-bound change as a major-version change regardless of what the dump shows.
 
 ## Code conventions
 
 - **`explicitApi()` is on** in all three published modules. Every public declaration needs an explicit
   visibility modifier and an explicit return type. Anything not meant for users is `internal`.
-- Match the surrounding style. The DSL leans on infix extension functions scoped by `@RoomQlDsl`;
-  keep new operators consistent with the existing ones, including their null-skipping behaviour.
-- **Null-skipping is the core contract.** A new value-taking operator must accept a nullable value and
-  emit nothing when it is `null`. Breaking that consistency is worse than omitting the operator.
+- Match the surrounding style. The DSL leans on infix extension functions scoped by `@RoomQlDsl`.
+- **Every value-taking operator ships two forms.** A required form (`eq`, `gte`, …) takes `T & Any`
+  (or `String`, `List<T & Any>` for the list operators) and will not compile against a nullable
+  value. An optional form, suffixed `IfNotNull` (`IfNotEmpty` for the two list operators — an empty
+  list has to skip too, not just a null one), takes the nullable type and skips the condition when
+  the value is absent. Keep a new operator's naming and split consistent with the existing ones;
+  see `ConditionScope.kt`'s class-level KDoc for the reasoning. `between` is the one exception with
+  no optional form — see the comment above it before adding `betweenIfNotNull`.
 
 ## Tests
 

@@ -37,8 +37,8 @@ class CatalogueRepository(
                 on { ProductEntityTable.brandId eq BrandEntityTable.id }
             }
             where {
-                ProductEntityTable.category inList categories
-                BrandEntityTable.country eq country
+                ProductEntityTable.category inListIfNotEmpty categories
+                BrandEntityTable.country eqIfNotNull country
             }
             orderBy(ProductEntityTable.name, SortDirection.ASC)
         }
@@ -66,7 +66,7 @@ class CatalogueRepository(
     fun observeByName(fragment: String?): ObservedQuery<ProductEntity> {
         val q = query {
             from(ProductEntityTable)
-            where { ProductEntityTable.name contains fragment }
+            where { ProductEntityTable.name containsIfNotNull fragment }
             orderBy(ProductEntityTable.name, SortDirection.ASC)
         }
         return ObservedQuery(productDao.observe(q.toQuery()), q.sql)
