@@ -10,6 +10,18 @@ _Nothing yet._
 
 ## [2.0.0] - Unreleased
 
+### Added
+
+- **Maven Central publishing.** All three artifacts publish under a new groupId,
+  `io.github.kotplat.roomql`, with `roomql-` prefixes dropped from the artifactIds
+  (`roomql-runtime` → `runtime`, `roomql-runtime-android` → `runtime-android`,
+  `roomql-ksp-processor` → `ksp-processor`) now that the group already encodes the project name.
+  Every publication is GPG-signed and ships a real sources jar and a Dokka-generated Javadoc jar,
+  both required by Sonatype Central Portal. See #63 and #64.
+- **Tag-triggered release workflow** (`.github/workflows/release.yml`) builds, signs, and uploads
+  a Central Portal deployment bundle on every version tag push, landing in a pending state for
+  manual review — publishing itself stays a deliberate human step. See #66.
+
 ### Changed — breaking
 
 - **Every value-taking condition operator splits into a required and an optional form.**
