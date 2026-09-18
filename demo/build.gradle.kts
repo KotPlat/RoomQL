@@ -38,8 +38,8 @@ kotlin {
 }
 
 dependencies {
-    // RoomQL as a published dependency — the same three coordinates the README documents.
-    implementation(libs.roomql.runtime)
+    // RoomQL as a published dependency — the same two coordinates the README documents.
+    // runtime-android already depends on runtime, so it comes along transitively.
     implementation(libs.roomql.runtime.android)
     ksp(libs.roomql.ksp.processor)
 

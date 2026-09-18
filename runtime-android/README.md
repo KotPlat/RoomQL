@@ -3,7 +3,7 @@
 The Android bridge for **RoomQL**. One extension function: it adapts a `RoomQlQuery` — the output of the [`roomql-runtime`](../runtime) DSL — into the `SupportSQLiteQuery` that Room's `@RawQuery` methods accept.
 
 ```
-com.github.ahmednobii.RoomQL:roomql-runtime-android:1.0.0
+io.github.kotplat.roomql:runtime-android:1.0.0
 ```
 
 ```kotlin

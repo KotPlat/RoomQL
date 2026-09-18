@@ -16,7 +16,7 @@ Always upgrade to the newest tag on JitPack to receive fixes.
 
 **Please do not open a public issue for security problems.**
 
-Report privately through GitHub's **[Report a vulnerability](https://github.com/ahmednobii/RoomQL/security/advisories/new)**
+Report privately through GitHub's **[Report a vulnerability](https://github.com/KotPlat/RoomQL/security/advisories/new)**
 (Security → Advisories → *Report a vulnerability*). This keeps the report
 private to the maintainers and needs no email address.
 

@@ -30,7 +30,7 @@ from the root), then sync — otherwise `mavenLocal()` has nothing for the IDE t
 
 To work on the library and the demo in one window instead, add the demo as a second linked Gradle
 project from the Gradle tool window's **+** button. Avoid wiring it in with `includeBuild`: that
-substitutes the `com.github.ahmednobii.RoomQL:*` coordinates for project dependencies, which is
+substitutes the `io.github.kotplat.roomql:*` coordinates for project dependencies, which is
 exactly the install path this build exists to verify.
 
 ## The screens

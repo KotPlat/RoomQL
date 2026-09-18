@@ -3,13 +3,13 @@
 The KSP processor behind **RoomQL**'s compile-time safety. It reads your Room `@Entity` classes and generates, in the same package, an `object <EntityName>Table` holding a typed `Column<T>` for every column — so a dynamic query built with the [`roomql-runtime`](../runtime) DSL references real Kotlin symbols instead of SQL strings.
 
 ```
-com.github.ahmednobii.RoomQL:roomql-ksp-processor:1.0.0
+io.github.kotplat.roomql:ksp-processor:1.0.0
 ```
 
 ```kotlin
 plugins { id("com.google.devtools.ksp") }
 
-dependencies { ksp("com.github.ahmednobii.RoomQL:roomql-ksp-processor:1.0.0") }
+dependencies { ksp("io.github.kotplat.roomql:ksp-processor:1.0.0") }
 ```
 
 Given this entity:

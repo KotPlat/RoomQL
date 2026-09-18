@@ -96,7 +96,7 @@ A change users can observe needs its documentation updated in the same PR:
 
 ## Reporting bugs
 
-Open a [GitHub issue](https://github.com/ahmednobii/RoomQL/issues) with the `query { }` block you
+Open a [GitHub issue](https://github.com/KotPlat/RoomQL/issues) with the `query { }` block you
 wrote, the SQL you expected, the SQL or exception you got, and your RoomQL, Room, Kotlin, and KSP
 versions. A failing assertion on `RoomQlQuery.sql` is the ideal report — it needs no device.
 
