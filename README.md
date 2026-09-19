@@ -7,7 +7,7 @@
 <p align="center"><b>A type-safe Kotlin DSL for building dynamic Android Room queries at runtime — no raw SQL strings, no reflection, no 2ⁿ DAO methods.</b></p>
 
 <p align="center">
-  <a href="https://jitpack.io/#KotPlat/RoomQL"><img src="https://img.shields.io/jitpack/v/github/KotPlat/RoomQL?label=JitPack&color=3DDC84" alt="JitPack version"/></a>
+  <a href="https://central.sonatype.com/namespace/io.github.kotplat.roomql"><img src="https://img.shields.io/maven-central/v/io.github.kotplat.roomql/runtime?label=Maven%20Central&color=3DDC84" alt="Maven Central version"/></a>
   <a href="https://github.com/KotPlat/RoomQL/actions/workflows/ci.yml"><img src="https://github.com/KotPlat/RoomQL/actions/workflows/ci.yml/badge.svg" alt="CI status"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="Apache 2.0 licensed"/></a>
   <a href="https://kotlinlang.org"><img src="https://img.shields.io/badge/Kotlin-2.0.x-7F52FF?logo=kotlin&logoColor=white" alt="Kotlin 2.0.x"/></a>
@@ -35,18 +35,6 @@ Room has no good answer for a query whose filters are decided at runtime. Write 
 <p align="center"><sub>One <code>query { }</code> block. As each filter goes <code>null</code>, its condition leaves the SQL — no <code>if</code> ladder, no <code>IS NULL OR</code>.</sub></p>
 
 ## Installation
-
-RoomQL publishes to Maven Central under `io.github.kotplat.roomql`. `mavenCentral()` is already in most projects' default repositories, so nothing needs adding there; JitPack stays available as a fallback for now (see `settings.gradle.kts` below) until every consumer has migrated.
-
-```kotlin
-dependencyResolutionManagement {
-    repositories {
-        google()
-        mavenCentral()
-        maven("https://jitpack.io")
-    }
-}
-```
 
 Declare the version catalog entries (`gradle/libs.versions.toml`):
 

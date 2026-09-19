@@ -10,11 +10,7 @@ plugins {
 group = "io.github.kotplat.roomql"
 version = System.getenv("VERSION") ?: "unspecified"
 
-// JitPack and the Maven Central release workflow both set VERSION to the tag being
-// built; local CI runs set it explicitly. Without it the
-// version silently falls back to "unspecified" and publishes artifacts nothing can
-// resolve — which surfaces on JitPack as an unhelpful "No build artifacts found".
-// Fail at the publish step instead, where the cause is obvious.
+// Without VERSION set, publishing silently falls back to "unspecified" — fail loudly instead.
 tasks.withType<AbstractPublishToMaven>().configureEach {
     doFirst {
         check(System.getenv("VERSION") != null) {

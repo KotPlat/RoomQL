@@ -11,22 +11,27 @@ This is a **standalone Gradle build**. It consumes RoomQL as published artifacts
 ./gradlew -p demo testDebugUnitTest
 ```
 
-Until RoomQL 2.0.0 is tagged and published on JitPack, build the library locally first — this is exactly what `jitpack.yml` runs when building a tag:
+This resolves `io.github.kotplat.roomql:*:2.0.0` from Maven Central.
+
+To build against an unreleased local change instead (e.g. while developing RoomQL itself),
+publish it locally first:
 
 ```bash
 VERSION=2.0.0 ./gradlew publishToMavenLocal
 ./gradlew -p demo assembleDebug
 ```
 
-`demo/settings.gradle.kts` lists `mavenLocal()` ahead of JitPack, so a locally published build wins when present.
+`demo/settings.gradle.kts` lists `mavenLocal()` ahead of Maven Central, so a locally published
+build overrides the published `2.0.0` when present.
 
 ## Opening it in Android Studio
 
 Open the **`demo/` directory itself** as the project (File -> Open -> select `demo/`), not the
 repository root. The demo is intentionally absent from the root `settings.gradle.kts`, so a root
 project window has no module owning `demo/src/**` and reds every import in it while `./gradlew -p
-demo build` still succeeds. Publish the library first (`VERSION=2.0.0 ./gradlew publishToMavenLocal`
-from the root), then sync — otherwise `mavenLocal()` has nothing for the IDE to resolve.
+demo build` still succeeds. Sync as-is to resolve `2.0.0` from Maven Central, or publish a local
+change first (`VERSION=2.0.0 ./gradlew publishToMavenLocal` from the root) to have `mavenLocal()`
+pick it up instead.
 
 To work on the library and the demo in one window instead, add the demo as a second linked Gradle
 project from the Gradle tool window's **+** button. Avoid wiring it in with `includeBuild`: that
