@@ -10,13 +10,13 @@ long-term-support branches.
 | 1.0.x   | :white_check_mark: |
 | < 1.0   | :x:                |
 
-Always upgrade to the newest tag on JitPack to receive fixes.
+Always upgrade to the newest version on Maven Central (`io.github.kotplat.roomql`) to receive fixes.
 
 ## Reporting a Vulnerability
 
 **Please do not open a public issue for security problems.**
 
-Report privately through GitHub's **[Report a vulnerability](https://github.com/ahmednobii/RoomQL/security/advisories/new)**
+Report privately through GitHub's **[Report a vulnerability](https://github.com/KotPlat/RoomQL/security/advisories/new)**
 (Security → Advisories → *Report a vulnerability*). This keeps the report
 private to the maintainers and needs no email address.
 
@@ -35,7 +35,7 @@ Please include:
 - **Acknowledgement** within **72 hours**.
 - An initial assessment (accepted / needs-more-info / declined) within **7 days**,
   with a brief explanation either way.
-- For accepted reports: a fix on the latest line and a new JitPack tag as soon as
+- For accepted reports: a fix on the latest line and a new Maven Central release as soon as
   practical, with credit to you in the advisory unless you prefer to remain anonymous.
 
 ## Scope notes

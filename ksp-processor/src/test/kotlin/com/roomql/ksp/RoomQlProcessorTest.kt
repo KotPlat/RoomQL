@@ -15,6 +15,11 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class RoomQlProcessorTest {
+    private fun fixture(fileName: String): SourceFile {
+        val resource = javaClass.classLoader.getResource("fixtures/$fileName")
+            ?: error("Fixture not found: fixtures/$fileName")
+        return SourceFile.kotlin(fileName, resource.readText())
+    }
 
     private fun compile(
         vararg sources: SourceFile,
@@ -33,27 +38,13 @@ class RoomQlProcessorTest {
     }
 
     private fun findGeneratedFile(compilation: KotlinCompilation, name: String): File =
-        compilation.kspSourcesDir.walkTopDown()
-            .filter { it.isFile && it.name == name }
-            .first()
+        compilation.kspSourcesDir.walkTopDown().first { it.isFile && it.name == name }
 
     // --- basic entity with explicit tableName ---
 
     @Test
     fun `generates table object with explicit tableName`() {
-        val entity = SourceFile.kotlin(
-            "UserEntity.kt", """
-            package test
-            import androidx.room.Entity
-
-            @Entity(tableName = "users")
-            data class UserEntity(
-                val id: Int,
-                val name: String,
-                val age: Int
-            )
-        """
-        )
+        val entity = fixture("UserEntity.kt")
 
         val (result, compilation) = compile(entity)
 
@@ -70,18 +61,7 @@ class RoomQlProcessorTest {
 
     @Test
     fun `generates table object using class name as default tableName`() {
-        val entity = SourceFile.kotlin(
-            "ProductEntity.kt", """
-            package test
-            import androidx.room.Entity
-
-            @Entity
-            data class ProductEntity(
-                val id: Long,
-                val title: String
-            )
-        """
-        )
+        val entity = fixture("ProductEntity.kt")
 
         val (result, compilation) = compile(entity)
 
@@ -96,19 +76,7 @@ class RoomQlProcessorTest {
 
     @Test
     fun `respects ColumnInfo name for column name`() {
-        val entity = SourceFile.kotlin(
-            "OrderEntity.kt", """
-            package test
-            import androidx.room.Entity
-            import androidx.room.ColumnInfo
-
-            @Entity(tableName = "orders")
-            data class OrderEntity(
-                val id: Int,
-                @ColumnInfo(name = "created_at") val createdAt: Long
-            )
-        """
-        )
+        val entity = fixture("OrderEntity.kt")
 
         val (result, compilation) = compile(entity)
 
@@ -123,18 +91,7 @@ class RoomQlProcessorTest {
 
     @Test
     fun `nullable properties produce nullable Column type`() {
-        val entity = SourceFile.kotlin(
-            "NullableEntity.kt", """
-            package test
-            import androidx.room.Entity
-
-            @Entity(tableName = "items")
-            data class NullableEntity(
-                val id: Int,
-                val email: String?
-            )
-        """
-        )
+        val entity = fixture("NullableEntity.kt")
 
         val (result, compilation) = compile(entity)
 
@@ -149,17 +106,7 @@ class RoomQlProcessorTest {
 
     @Test
     fun `generated file is in same package as entity`() {
-        val entity = SourceFile.kotlin(
-            "RoomEntity.kt", """
-            package com.example.data
-            import androidx.room.Entity
-
-            @Entity(tableName = "rooms")
-            data class RoomEntity(
-                val id: Int
-            )
-        """
-        )
+        val entity = fixture("RoomEntity.kt")
 
         val (result, compilation) = compile(entity)
 
@@ -173,15 +120,7 @@ class RoomQlProcessorTest {
 
     @Test
     fun `roomql tableSuffix option overrides the generated object name suffix`() {
-        val entity = SourceFile.kotlin(
-            "UserEntity.kt", """
-            package test
-            import androidx.room.Entity
-
-            @Entity(tableName = "users")
-            data class UserEntity(val id: Int)
-        """
-        )
+        val entity = fixture("UserEntitySuffix.kt")
 
         val (result, compilation) = compile(entity, processorOptions = mapOf("roomql.tableSuffix" to "Cols"))
 
@@ -193,20 +132,7 @@ class RoomQlProcessorTest {
 
     @Test
     fun `Ignore'd properties are excluded from the generated columns and allColumnNames`() {
-        val entity = SourceFile.kotlin(
-            "UserEntity.kt", """
-            package test
-            import androidx.room.Entity
-            import androidx.room.Ignore
-
-            @Entity(tableName = "users")
-            data class UserEntity(
-                val id: Int,
-                val name: String,
-                @Ignore val fullNameCache: String = ""
-            )
-        """
-        )
+        val entity = fixture("UserEntityIgnore.kt")
 
         val (result, compilation) = compile(entity)
 
@@ -224,19 +150,7 @@ class RoomQlProcessorTest {
 
     @Test
     fun `generated object implements EntityTable with tableName and allColumnNames`() {
-        val entity = SourceFile.kotlin(
-            "ItemEntity.kt", """
-            package test
-            import androidx.room.Entity
-            import androidx.room.ColumnInfo
-
-            @Entity(tableName = "items")
-            data class ItemEntity(
-                val id: Int,
-                @ColumnInfo(name = "item_name") val name: String
-            )
-        """
-        )
+        val entity = fixture("ItemEntity.kt")
 
         val (result, compilation) = compile(entity)
 
@@ -254,18 +168,7 @@ class RoomQlProcessorTest {
 
     @Test
     fun `multiple entities each produce their own columns file`() {
-        val source = SourceFile.kotlin(
-            "Entities.kt", """
-            package test
-            import androidx.room.Entity
-
-            @Entity(tableName = "users")
-            data class UserEntity(val id: Int)
-
-            @Entity(tableName = "posts")
-            data class PostEntity(val id: Int, val title: String)
-        """
-        )
+        val source = fixture("Entities.kt")
 
         val (result, compilation) = compile(source)
 

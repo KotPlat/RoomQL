@@ -8,7 +8,19 @@ All notable changes to **RoomQL** are documented here. The format follows
 
 _Nothing yet._
 
-## [2.0.0] - Unreleased
+## [2.0.0] - 2026-09-19
+
+### Added
+
+- **Maven Central publishing.** All three artifacts publish under a new groupId,
+  `io.github.kotplat.roomql`, with `roomql-` prefixes dropped from the artifactIds
+  (`roomql-runtime` → `runtime`, `roomql-runtime-android` → `runtime-android`,
+  `roomql-ksp-processor` → `ksp-processor`) now that the group already encodes the project name.
+  Every publication is GPG-signed and ships a real sources jar and a Dokka-generated Javadoc jar,
+  both required by Sonatype Central Portal. See #63 and #64.
+- **Tag-triggered release workflow** (`.github/workflows/release.yml`) builds, signs, and uploads
+  a Central Portal deployment bundle on every version tag push, landing in a pending state for
+  manual review — publishing itself stays a deliberate human step. See #66.
 
 ### Changed — breaking
 
@@ -102,7 +114,8 @@ without `limit()`, a `having()` without `groupBy()`, and a `join()` on a raw-str
 Annotation-driven DAO generation. KSP cannot read function bodies, so the query and its
 `observedEntities` cannot be inferred from an annotated method. The exploration lives on the
 `development` branch and is tracked for v2 in
-[#6](https://github.com/ahmednobii/RoomQL/issues/6) and
-[#13](https://github.com/ahmednobii/RoomQL/issues/13).
+[#6](https://github.com/KotPlat/RoomQL/issues/6) and
+[#13](https://github.com/KotPlat/RoomQL/issues/13).
 
-[1.0.0]: https://github.com/ahmednobii/RoomQL/releases/tag/1.0.0
+[2.0.0]: https://github.com/KotPlat/RoomQL/releases/tag/2.0.0
+[1.0.0]: https://github.com/KotPlat/RoomQL/releases/tag/1.0.0

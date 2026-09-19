@@ -1,16 +1,16 @@
 plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.binary.compatibility.validator)
+    alias(libs.plugins.dokka)
+    alias(libs.plugins.dokka.javadoc)
     `maven-publish`
+    signing
 }
 
-group = "com.github.ahmednobii.RoomQL"
+group = "io.github.kotplat.roomql"
 version = System.getenv("VERSION") ?: "unspecified"
 
-// JitPack sets VERSION to the tag it is building; CI sets it explicitly. Without it the
-// version silently falls back to "unspecified" and publishes artifacts nothing can
-// resolve — which surfaces on JitPack as an unhelpful "No build artifacts found".
-// Fail at the publish step instead, where the cause is obvious.
+// Without VERSION set, publishing silently falls back to "unspecified" — fail loudly instead.
 tasks.withType<AbstractPublishToMaven>().configureEach {
     doFirst {
         check(System.getenv("VERSION") != null) {
@@ -38,16 +38,25 @@ tasks.test {
     useJUnitPlatform()
 }
 
+// Maven Central requires a Javadoc jar alongside every artifact. Dokka's javadoc format
+// renders KDoc as real Javadoc-style HTML rather than shipping an empty placeholder jar.
+val dokkaJavadocJar by tasks.registering(Jar::class) {
+    dependsOn(tasks.named("dokkaGeneratePublicationJavadoc"))
+    from(layout.buildDirectory.dir("dokka/javadoc"))
+    archiveClassifier.set("javadoc")
+}
+
 publishing {
     publications {
         create<MavenPublication>("maven") {
-            artifactId = "roomql-runtime"
+            artifactId = "runtime"
             from(components["java"])
+            artifact(dokkaJavadocJar)
 
             pom {
                 name.set("RoomQL Runtime")
                 description.set("Type-safe Kotlin DSL for building dynamic Android Room queries at runtime: the query { } builder, typed Column references, and required/IfNotNull condition pairs for filters that can disappear. Pure JVM, unit-testable without an emulator.")
-                url.set("https://github.com/ahmednobii/RoomQL")
+                url.set("https://github.com/KotPlat/RoomQL")
                 inceptionYear.set("2026")
 
                 licenses {
@@ -65,15 +74,27 @@ publishing {
                     }
                 }
                 scm {
-                    url.set("https://github.com/ahmednobii/RoomQL")
-                    connection.set("scm:git:https://github.com/ahmednobii/RoomQL.git")
-                    developerConnection.set("scm:git:ssh://git@github.com/ahmednobii/RoomQL.git")
+                    url.set("https://github.com/KotPlat/RoomQL")
+                    connection.set("scm:git:https://github.com/KotPlat/RoomQL.git")
+                    developerConnection.set("scm:git:ssh://git@github.com/KotPlat/RoomQL.git")
                 }
                 issueManagement {
                     system.set("GitHub Issues")
-                    url.set("https://github.com/ahmednobii/RoomQL/issues")
+                    url.set("https://github.com/KotPlat/RoomQL/issues")
                 }
             }
         }
+    }
+}
+
+// Maven Central rejects unsigned artifacts. Signing only activates when the in-memory
+// key is present — set by the release workflow, absent for local publishToMavenLocal —
+// so local development and CI's build/test/publishToMavenLocal checks stay unaffected.
+val signingKey = System.getenv("ORG_GPG_KEY")
+val signingPassphrase = System.getenv("ORG_GPG_PASSPHRASE")
+if (signingKey != null && signingPassphrase != null) {
+    signing {
+        useInMemoryPgpKeys(signingKey, signingPassphrase)
+        sign(publishing.publications["maven"])
     }
 }

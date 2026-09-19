@@ -7,8 +7,8 @@
 <p align="center"><b>A type-safe Kotlin DSL for building dynamic Android Room queries at runtime — no raw SQL strings, no reflection, no 2ⁿ DAO methods.</b></p>
 
 <p align="center">
-  <a href="https://jitpack.io/#ahmednobii/RoomQL"><img src="https://img.shields.io/jitpack/v/github/ahmednobii/RoomQL?label=JitPack&color=3DDC84" alt="JitPack version"/></a>
-  <a href="https://github.com/ahmednobii/RoomQL/actions/workflows/ci.yml"><img src="https://github.com/ahmednobii/RoomQL/actions/workflows/ci.yml/badge.svg" alt="CI status"/></a>
+  <a href="https://central.sonatype.com/namespace/io.github.kotplat.roomql"><img src="https://img.shields.io/maven-central/v/io.github.kotplat.roomql/runtime?label=Maven%20Central&color=3DDC84" alt="Maven Central version"/></a>
+  <a href="https://github.com/KotPlat/RoomQL/actions/workflows/ci.yml"><img src="https://github.com/KotPlat/RoomQL/actions/workflows/ci.yml/badge.svg" alt="CI status"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="Apache 2.0 licensed"/></a>
   <a href="https://kotlinlang.org"><img src="https://img.shields.io/badge/Kotlin-2.0.x-7F52FF?logo=kotlin&logoColor=white" alt="Kotlin 2.0.x"/></a>
   <a href="https://developer.android.com"><img src="https://img.shields.io/badge/minSdk-21%2B-3DDC84?logo=android&logoColor=white" alt="minSdk 21+"/></a>
@@ -36,28 +36,15 @@ Room has no good answer for a query whose filters are decided at runtime. Write 
 
 ## Installation
 
-RoomQL 2.0.0 publishes through JitPack. Add the repository in `settings.gradle.kts`:
-
-```kotlin
-dependencyResolutionManagement {
-    repositories {
-        google()
-        mavenCentral()
-        maven("https://jitpack.io")
-    }
-}
-```
-
-Then declare the three artifacts (version catalog form, `gradle/libs.versions.toml`):
+Declare the version catalog entries (`gradle/libs.versions.toml`):
 
 ```toml
 [versions]
 roomql = "2.0.0"
 
 [libraries]
-roomql-runtime         = { module = "com.github.ahmednobii.RoomQL:roomql-runtime",         version.ref = "roomql" }
-roomql-runtime-android = { module = "com.github.ahmednobii.RoomQL:roomql-runtime-android", version.ref = "roomql" }
-roomql-ksp-processor   = { module = "com.github.ahmednobii.RoomQL:roomql-ksp-processor",   version.ref = "roomql" }
+roomql-runtime-android = { module = "io.github.kotplat.roomql:runtime-android", version.ref = "roomql" }
+roomql-ksp-processor   = { module = "io.github.kotplat.roomql:ksp-processor",   version.ref = "roomql" }
 ```
 
 ```kotlin
@@ -66,13 +53,14 @@ plugins {
 }
 
 dependencies {
-    implementation(libs.roomql.runtime)           // the query { } DSL (pure JVM)
-    implementation(libs.roomql.runtime.android)   // the .toQuery() bridge to Room
+    implementation(libs.roomql.runtime.android)   // the .toQuery() bridge to Room; pulls in :runtime transitively
     ksp(libs.roomql.ksp.processor)                // generates the *Table objects
 }
 ```
 
-All three are required on Android. `:runtime` is a plain-JVM module so the DSL stays unit-testable without an emulator; `:runtime-android` is the thin adapter that turns its output into the `SupportSQLiteQuery` Room wants. See [Modules](#modules) for what each one contains.
+That's the whole dependency block for Android use — `:runtime-android` already depends on `:runtime` (the `query { }` DSL), so it comes along automatically. `ksp(...)` can't be folded into it: Gradle has no mechanism to pull an annotation/symbol processor transitively through `implementation`/`api`, so every KSP-based library (Room, Moshi, Hilt included) needs its own explicit `ksp(...)` line.
+
+Add `io.github.kotplat.roomql:runtime` directly only if you want the DSL without the Room bridge — for example, unit-testing generated SQL on the plain JVM with no emulator. See [Modules](#modules) for what each artifact contains.
 
 ### Requirements
 
@@ -208,13 +196,13 @@ No. RoomQL's KSP processor generates a `<EntityName>Table` object with a typed `
 
 Values are always bound as positional `?` parameters and passed to SQLite as an argument list — RoomQL never interpolates a user-supplied value into the SQL text. Table and column names come from generated code rather than user input. The one exception is the raw-string `from("table_name")` overload: never pass an untrusted string to it.
 
-### Why do I need three artifacts instead of one?
+### Why are there three modules instead of one?
 
-The DSL (`roomql-runtime`) is a pure-JVM module with no Android dependency, which is what lets you unit-test generated SQL on the JVM with no emulator or Robolectric. `roomql-runtime-android` is the thin Android bridge holding only `RoomQlQuery.toQuery()`, and `roomql-ksp-processor` runs at build time only. Splitting them keeps the Android dependency out of your test path.
+The DSL (`runtime`) is a pure-JVM module with no Android dependency, which is what lets you unit-test generated SQL on the JVM with no emulator or Robolectric. `runtime-android` is the thin Android bridge holding only `RoomQlQuery.toQuery()`, and `ksp-processor` runs at build time only. Splitting them keeps the Android dependency out of your test path — and in practice it costs you only two Gradle declarations, not three: `implementation(runtime-android)` already pulls in `runtime` transitively (see [Installation](#installation)).
 
 ### Does RoomQL work with Kotlin Multiplatform?
 
-Not yet. `roomql-runtime` is a plain JVM module (not a KMP source set), and `roomql-runtime-android` depends on `androidx.sqlite`. RoomQL targets Android and JVM projects that use Room.
+Not yet. `runtime` is a plain JVM module (not a KMP source set), and `runtime-android` depends on `androidx.sqlite`. RoomQL targets Android and JVM projects that use Room.
 
 ### Does RoomQL support KAPT?
 
@@ -248,15 +236,15 @@ Know these before adopting:
 
 | Module | Artifact | What it holds |
 |---|---|---|
-| [`:runtime`](runtime) | `roomql-runtime` | the `query { }` DSL, `Column<T>`, conditions — pure JVM |
-| [`:runtime-android`](runtime-android) | `roomql-runtime-android` | `RoomQlQuery.toQuery()` → `SupportSQLiteQuery` |
-| [`:ksp-processor`](ksp-processor) | `roomql-ksp-processor` | generates the `*Table` objects from `@Entity` |
+| [`:runtime`](runtime) | `io.github.kotplat.roomql:runtime` | the `query { }` DSL, `Column<T>`, conditions — pure JVM |
+| [`:runtime-android`](runtime-android) | `io.github.kotplat.roomql:runtime-android` | `RoomQlQuery.toQuery()` → `SupportSQLiteQuery` |
+| [`:ksp-processor`](ksp-processor) | `io.github.kotplat.roomql:ksp-processor` | generates the `*Table` objects from `@Entity` |
 
-> **On annotation-driven integration.** RoomQL uses Room's manual `@RawQuery`: you declare the method, build with `query { }`, and pass `.toQuery()`. A zero-boilerplate annotation-driven integration was explored and dropped — KSP cannot read function bodies, so it could not infer the query or `observedEntities`. That exploration lives on the `development` branch and is tracked in issues [#6](https://github.com/ahmednobii/RoomQL/issues/6) and [#13](https://github.com/ahmednobii/RoomQL/issues/13). No release ships an annotation artifact yet.
+> **On annotation-driven integration.** RoomQL uses Room's manual `@RawQuery`: you declare the method, build with `query { }`, and pass `.toQuery()`. A zero-boilerplate annotation-driven integration was explored and dropped — KSP cannot read function bodies, so it could not infer the query or `observedEntities`. That exploration lives on the `development` branch and is tracked in issues [#6](https://github.com/KotPlat/RoomQL/issues/6) and [#13](https://github.com/KotPlat/RoomQL/issues/13). No release ships an annotation artifact yet.
 
 ## Contributing and support
 
-Bug reports, feature requests, and questions all go to [GitHub Issues](https://github.com/ahmednobii/RoomQL/issues). See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request, [CHANGELOG.md](CHANGELOG.md) for release notes, and [SECURITY.md](SECURITY.md) to report a vulnerability privately.
+Bug reports, feature requests, and questions all go to [GitHub Issues](https://github.com/KotPlat/RoomQL/issues). See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request, [CHANGELOG.md](CHANGELOG.md) for release notes, and [SECURITY.md](SECURITY.md) to report a vulnerability privately.
 
 ## License
 

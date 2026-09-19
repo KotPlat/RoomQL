@@ -26,7 +26,7 @@ The public surface is deliberately small and is frozen by [Binary Compatibility 
 
 ## `com.roomql.runtime` — the DSL
 
-Artifact `roomql-runtime`. Pure JVM, no Android dependency.
+Artifact `io.github.kotplat.roomql:runtime`. Pure JVM, no Android dependency.
 
 ### query
 
@@ -98,7 +98,7 @@ The receiver inside `where { }` and `having { }`. Every operator is an extension
 
 `like`, `notLike`, and `contains` are constrained to `String` columns (`T : String?`), so they cannot be applied to a numeric column. `like` and `notLike` take the SQL pattern verbatim; `contains` adds the `%` wildcards for you.
 
-**`T & Any` is a compile-time guarantee, not a runtime one.** Generics erase, so a `null` crossing an erased boundary — a Java caller, or an unchecked cast — is not stopped by the type at the JVM level. It is still caught: every operator above is a public function with a non-null parameter, so Kotlin compiles a `checkNotNullParameter` guard into `roomql-runtime`'s own bytecode, and such a call throws `NullPointerException` immediately rather than silently binding `NULL` into the arguments. `internal` and `private` functions do not get this guard by default; every operator here is `public`, so all of them do.
+**`T & Any` is a compile-time guarantee, not a runtime one.** Generics erase, so a `null` crossing an erased boundary — a Java caller, or an unchecked cast — is not stopped by the type at the JVM level. It is still caught: every operator above is a public function with a non-null parameter, so Kotlin compiles a `checkNotNullParameter` guard into `runtime`'s own bytecode, and such a call throws `NullPointerException` immediately rather than silently binding `NULL` into the arguments. `internal` and `private` functions do not get this guard by default; every operator here is `public`, so all of them do.
 
 #### or
 
@@ -189,7 +189,7 @@ Thrown by `build()` — and therefore by `query { }` — when the configured que
 
 ## `com.roomql.android` — the Room bridge
 
-Artifact `roomql-runtime-android`. Requires minSdk 21.
+Artifact `io.github.kotplat.roomql:runtime-android`. Requires minSdk 21.
 
 ```kotlin
 public fun RoomQlQuery.toQuery(): SupportSQLiteQuery
@@ -205,7 +205,7 @@ userDao.search(q.toQuery())
 
 ## `com.roomql.ksp` — the code generator
 
-Artifact `roomql-ksp-processor`, applied with `ksp(...)`. Its only public type is the processor entry point, registered through `META-INF/services` — you never reference it in your own code.
+Artifact `io.github.kotplat.roomql:ksp-processor`, applied with `ksp(...)`. Its only public type is the processor entry point, registered through `META-INF/services` — you never reference it in your own code.
 
 ```kotlin
 public class RoomQlProcessorProvider : SymbolProcessorProvider

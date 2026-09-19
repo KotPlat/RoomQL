@@ -12,6 +12,7 @@ build/
 *.iml
 *.ipr
 *.iws
+bin/
 
 # Android
 local.properties
