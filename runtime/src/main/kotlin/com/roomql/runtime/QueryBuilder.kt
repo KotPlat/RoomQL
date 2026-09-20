@@ -5,12 +5,12 @@ public class QueryBuilder {
     private var fromTable: String? = null
     private var fromEntityTable: EntityTable? = null
     private val joins = mutableListOf<JoinClause>()
-    private var whereScope: ConditionScope? = null
-    private val orderByClauses = mutableListOf<Pair<Column<*>, SortDirection>>()
+    private var whereScope: WhereScope? = null
+    private val orderByClauses = mutableListOf<Pair<Expression<*>, SortDirection>>()
     private var limitValue: Int? = null
     private var offsetValue: Int? = null
     private var groupByColumn: Column<*>? = null
-    private var havingScope: ConditionScope? = null
+    private var havingScope: HavingScope? = null
 
     public fun from(tableName: String) {
         fromTable = tableName
@@ -26,13 +26,13 @@ public class QueryBuilder {
         joins.add(JoinClause(table, type, scope.onCondition))
     }
 
-    public fun where(block: ConditionScope.() -> Unit) {
-        val scope = whereScope ?: ConditionScope().also { whereScope = it }
+    public fun where(block: WhereScope.() -> Unit) {
+        val scope = whereScope ?: WhereScope().also { whereScope = it }
         scope.apply(block)
     }
 
-    public fun orderBy(column: Column<*>, direction: SortDirection) {
-        orderByClauses.add(column to direction)
+    public fun orderBy(expression: Expression<*>, direction: SortDirection) {
+        orderByClauses.add(expression to direction)
     }
 
     public fun limit(n: Int) {
@@ -47,8 +47,8 @@ public class QueryBuilder {
         groupByColumn = column
     }
 
-    public fun having(block: ConditionScope.() -> Unit) {
-        val scope = havingScope ?: ConditionScope().also { havingScope = it }
+    public fun having(block: HavingScope.() -> Unit) {
+        val scope = havingScope ?: HavingScope().also { havingScope = it }
         scope.apply(block)
     }
 
@@ -126,16 +126,17 @@ public class QueryBuilder {
 private const val SQL_AND = " AND "
 private const val SQL_OR = " OR "
 
-/** Qualifies with the table name only when the column name collides across the joined tables. */
-private fun Column<*>.render(collidingNames: Set<String>): String =
-    if (columnName in collidingNames) "$tableName.$columnName" else columnName
+/** Qualifies a column with its table name only when the column name collides across the joined tables. */
+private fun Expression<*>.render(collidingNames: Set<String>): String = when (this) {
+    is Column<*> -> if (columnName in collidingNames) "$tableName.$columnName" else columnName
+}
 
 private fun renderCondition(condition: Condition, args: MutableList<Any?>, sb: StringBuilder, collidingNames: Set<String>) {
     when (condition) {
         is Condition.Empty -> Unit
         is Condition.Simple -> {
             args.addAll(condition.args)
-            sb.append(condition.template.replace("%s", condition.column.render(collidingNames)))
+            sb.append(condition.template.replace("%s", condition.expression.render(collidingNames)))
         }
         is Condition.ColumnCompare ->
             sb.append("${condition.left.tableName}.${condition.left.columnName} = ${condition.right.tableName}.${condition.right.columnName}")
