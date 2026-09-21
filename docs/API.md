@@ -11,9 +11,10 @@ The public surface is deliberately small and is frozen by [Binary Compatibility 
 - [`com.roomql.runtime` — the DSL](#comroomqlruntime--the-dsl)
   - [query](#query)
   - [QueryBuilder](#querybuilder)
-  - [ConditionScope: the condition operators](#conditionscope-the-condition-operators)
+  - [WhereScope and HavingScope: the condition operators](#wherescope-and-havingscope-the-condition-operators)
   - [JoinScope and JoinConditionScope](#joinscope-and-joinconditionscope)
   - [Column](#column)
+  - [Aggregate functions](#aggregate-functions)
   - [EntityTable](#entitytable)
   - [RoomQlQuery](#roomqlquery)
   - [JoinType and SortDirection](#jointype-and-sortdirection)
@@ -52,19 +53,19 @@ The receiver inside `query { }`. Marked `@RoomQlDsl`, so outer-scope members can
 | `from` | `from(table: EntityTable)` | Sets the primary table from a generated `*Table`. Required for joins. |
 | `from` | `from(tableName: String)` | Sets the primary table by raw name. Carries no column metadata, so it cannot be joined. |
 | `join` | `join(table: EntityTable, type: JoinType, block: JoinScope.() -> Unit)` | Adds a JOIN with an `ON` predicate. Call repeatedly to join more than two tables. |
-| `where` | `where(block: ConditionScope.() -> Unit)` | Opens a `ConditionScope`. Repeated calls merge into one AND-combined set. |
+| `where` | `where(block: WhereScope.() -> Unit)` | Opens a `WhereScope`. Repeated calls merge into one AND-combined set. |
 | `groupBy` | `groupBy(column: Column<*>)` | Groups by one column. Last call wins. |
-| `having` | `having(block: ConditionScope.() -> Unit)` | Opens a `ConditionScope` for `HAVING`. Requires `groupBy`. |
-| `orderBy` | `orderBy(column: Column<*>, direction: SortDirection)` | Appends a sort key. Call repeatedly for a multi-column `ORDER BY`. |
+| `having` | `having(block: HavingScope.() -> Unit)` | Opens a `HavingScope` for `HAVING`. Requires `groupBy`. |
+| `orderBy` | `orderBy(expression: Expression<*>, direction: SortDirection)` | Appends a sort key. Call repeatedly for a multi-column `ORDER BY`. |
 | `limit` | `limit(n: Int)` | Sets `LIMIT`. Must be positive. |
 | `offset` | `offset(n: Int)` | Sets `OFFSET`. Requires `limit`. |
 | `build` | `build(): RoomQlQuery` | Validates and renders. `query { }` calls this for you. |
 
 `QueryBuilder` is **not thread-safe** — build a query on one thread or coroutine and never share a half-built builder.
 
-### ConditionScope: the condition operators
+### WhereScope and HavingScope: the condition operators
 
-The receiver inside `where { }` and `having { }`. Every operator is an extension on `Column<T>`, so it registers itself in the enclosing scope automatically.
+`WhereScope` (the receiver inside `where { }`) and `HavingScope` (the receiver inside `having { }`) declare the same operator set below. `WhereScope`'s operators are extensions on `Column<T>` — `where { }` only ever sees real columns, since SQL forbids aggregates before grouping exists. `HavingScope`'s operators are extensions on `Expression<T>`, which `Column<T>` implements, so `having { }` also accepts aggregate results. The table below shows the `Column<T>` (`WhereScope`) form; read `Column<T>` as `Expression<T>` for the `HavingScope` equivalent.
 
 **Every value-taking condition comes in a required and an optional form**, and the name tells you which is which. The required form takes `T & Any` — Kotlin's syntax for "definitely non-null `T`" — so passing a nullable value fails to compile. The optional form is suffixed `IfNotNull` (or `IfNotEmpty` for the two list operators) and takes `T?`, skipping the condition — leaving it out of the generated SQL — when the value is absent. `isNull` and `isNotNull` take no value and never skip; they are how you match SQL `NULL` itself.
 
@@ -103,7 +104,7 @@ The receiver inside `where { }` and `having { }`. Every operator is an extension
 #### or
 
 ```kotlin
-public fun or(block: ConditionScope.() -> Unit)
+public fun or(block: WhereScope.() -> Unit) // and the matching overload on HavingScope
 ```
 
 Groups alternatives. The group is parenthesised and combined with the surrounding conditions by `AND`. A group whose conditions all skip contributes nothing — no empty `()` is emitted.
@@ -140,6 +141,30 @@ public data class Column<T>(val columnName: String, val tableName: String)
 ```
 
 A typed reference to one SQL column. You do not construct these — the KSP processor generates one per entity property, and `T` carries the property's Kotlin type (including nullability) so that operators type-check against it.
+
+### Aggregate functions
+
+```kotlin
+public fun count(column: Expression<*>): Expression<Long>
+public fun countAll(): Expression<Long>
+public fun <T : Number?> sum(column: Expression<T>): Expression<T?>
+public fun <T : Number?> avg(column: Expression<T>): Expression<Double?>
+public fun <T> min(column: Expression<T>): Expression<T?>
+public fun <T> max(column: Expression<T>): Expression<T?>
+```
+
+Each returns an `Expression<T>`, so the result can be used anywhere `having { }` or `orderBy` accepts one — including compared against a value or combined with other conditions, same as a `Column`:
+
+```kotlin
+query {
+    from(OrdersTable)
+    groupBy(OrdersTable.customerId)
+    having { count(OrdersTable.id) gt 5 }
+    orderBy(sum(OrdersTable.amount), SortDirection.DESC)
+}
+```
+
+`count` and `countAll` are deliberately separate: under a `LEFT JOIN`, `COUNT(column)` yields 0 for an unmatched row, while `COUNT(*)` yields 1. `sum` and `avg` are constrained to numeric column types; `avg` always returns `Double?` regardless of the input numeric type, matching SQL's own `AVG`. All six aggregate results are nullable, since SQL returns `NULL` for an empty group.
 
 ### EntityTable
 

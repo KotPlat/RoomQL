@@ -1,4 +1,13 @@
-public final class com/roomql/runtime/Column {
+public final class com/roomql/runtime/AggregateKt {
+	public static final fun avg (Lcom/roomql/runtime/Expression;)Lcom/roomql/runtime/Expression;
+	public static final fun count (Lcom/roomql/runtime/Expression;)Lcom/roomql/runtime/Expression;
+	public static final fun countAll ()Lcom/roomql/runtime/Expression;
+	public static final fun max (Lcom/roomql/runtime/Expression;)Lcom/roomql/runtime/Expression;
+	public static final fun min (Lcom/roomql/runtime/Expression;)Lcom/roomql/runtime/Expression;
+	public static final fun sum (Lcom/roomql/runtime/Expression;)Lcom/roomql/runtime/Expression;
+}
+
+public final class com/roomql/runtime/Column : com/roomql/runtime/Expression {
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
@@ -11,39 +20,45 @@ public final class com/roomql/runtime/Column {
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class com/roomql/runtime/ConditionScope {
-	public fun <init> ()V
-	public final fun between (Lcom/roomql/runtime/Column;Ljava/lang/Object;Ljava/lang/Object;)V
-	public final fun contains (Lcom/roomql/runtime/Column;Ljava/lang/String;)V
-	public final fun containsIfNotNull (Lcom/roomql/runtime/Column;Ljava/lang/String;)V
-	public final fun eq (Lcom/roomql/runtime/Column;Ljava/lang/Object;)V
-	public final fun eqIfNotNull (Lcom/roomql/runtime/Column;Ljava/lang/Object;)V
-	public final fun gt (Lcom/roomql/runtime/Column;Ljava/lang/Object;)V
-	public final fun gtIfNotNull (Lcom/roomql/runtime/Column;Ljava/lang/Object;)V
-	public final fun gte (Lcom/roomql/runtime/Column;Ljava/lang/Object;)V
-	public final fun gteIfNotNull (Lcom/roomql/runtime/Column;Ljava/lang/Object;)V
-	public final fun inList (Lcom/roomql/runtime/Column;Ljava/util/List;)V
-	public final fun inListIfNotEmpty (Lcom/roomql/runtime/Column;Ljava/util/List;)V
-	public final fun isNotNull (Lcom/roomql/runtime/Column;)V
-	public final fun isNull (Lcom/roomql/runtime/Column;)V
-	public final fun like (Lcom/roomql/runtime/Column;Ljava/lang/String;)V
-	public final fun likeIfNotNull (Lcom/roomql/runtime/Column;Ljava/lang/String;)V
-	public final fun lt (Lcom/roomql/runtime/Column;Ljava/lang/Object;)V
-	public final fun ltIfNotNull (Lcom/roomql/runtime/Column;Ljava/lang/Object;)V
-	public final fun lte (Lcom/roomql/runtime/Column;Ljava/lang/Object;)V
-	public final fun lteIfNotNull (Lcom/roomql/runtime/Column;Ljava/lang/Object;)V
-	public final fun notEq (Lcom/roomql/runtime/Column;Ljava/lang/Object;)V
-	public final fun notEqIfNotNull (Lcom/roomql/runtime/Column;Ljava/lang/Object;)V
-	public final fun notInList (Lcom/roomql/runtime/Column;Ljava/util/List;)V
-	public final fun notInListIfNotEmpty (Lcom/roomql/runtime/Column;Ljava/util/List;)V
-	public final fun notLike (Lcom/roomql/runtime/Column;Ljava/lang/String;)V
-	public final fun notLikeIfNotNull (Lcom/roomql/runtime/Column;Ljava/lang/String;)V
-	public final fun or (Lkotlin/jvm/functions/Function1;)V
+public abstract class com/roomql/runtime/ConditionScope {
 }
 
 public abstract interface class com/roomql/runtime/EntityTable {
 	public abstract fun getAllColumnNames ()Ljava/util/List;
 	public abstract fun getTableName ()Ljava/lang/String;
+}
+
+public abstract interface class com/roomql/runtime/Expression {
+}
+
+public final class com/roomql/runtime/HavingScope : com/roomql/runtime/ConditionScope {
+	public fun <init> ()V
+	public final fun between (Lcom/roomql/runtime/Expression;Ljava/lang/Object;Ljava/lang/Object;)V
+	public final fun contains (Lcom/roomql/runtime/Expression;Ljava/lang/String;)V
+	public final fun containsIfNotNull (Lcom/roomql/runtime/Expression;Ljava/lang/String;)V
+	public final fun eq (Lcom/roomql/runtime/Expression;Ljava/lang/Object;)V
+	public final fun eqIfNotNull (Lcom/roomql/runtime/Expression;Ljava/lang/Object;)V
+	public final fun gt (Lcom/roomql/runtime/Expression;Ljava/lang/Object;)V
+	public final fun gtIfNotNull (Lcom/roomql/runtime/Expression;Ljava/lang/Object;)V
+	public final fun gte (Lcom/roomql/runtime/Expression;Ljava/lang/Object;)V
+	public final fun gteIfNotNull (Lcom/roomql/runtime/Expression;Ljava/lang/Object;)V
+	public final fun inList (Lcom/roomql/runtime/Expression;Ljava/util/List;)V
+	public final fun inListIfNotEmpty (Lcom/roomql/runtime/Expression;Ljava/util/List;)V
+	public final fun isNotNull (Lcom/roomql/runtime/Expression;)V
+	public final fun isNull (Lcom/roomql/runtime/Expression;)V
+	public final fun like (Lcom/roomql/runtime/Expression;Ljava/lang/String;)V
+	public final fun likeIfNotNull (Lcom/roomql/runtime/Expression;Ljava/lang/String;)V
+	public final fun lt (Lcom/roomql/runtime/Expression;Ljava/lang/Object;)V
+	public final fun ltIfNotNull (Lcom/roomql/runtime/Expression;Ljava/lang/Object;)V
+	public final fun lte (Lcom/roomql/runtime/Expression;Ljava/lang/Object;)V
+	public final fun lteIfNotNull (Lcom/roomql/runtime/Expression;Ljava/lang/Object;)V
+	public final fun notEq (Lcom/roomql/runtime/Expression;Ljava/lang/Object;)V
+	public final fun notEqIfNotNull (Lcom/roomql/runtime/Expression;Ljava/lang/Object;)V
+	public final fun notInList (Lcom/roomql/runtime/Expression;Ljava/util/List;)V
+	public final fun notInListIfNotEmpty (Lcom/roomql/runtime/Expression;Ljava/util/List;)V
+	public final fun notLike (Lcom/roomql/runtime/Expression;Ljava/lang/String;)V
+	public final fun notLikeIfNotNull (Lcom/roomql/runtime/Expression;Ljava/lang/String;)V
+	public final fun or (Lkotlin/jvm/functions/Function1;)V
 }
 
 public final class com/roomql/runtime/JoinConditionScope {
@@ -74,7 +89,7 @@ public final class com/roomql/runtime/QueryBuilder {
 	public final fun join (Lcom/roomql/runtime/EntityTable;Lcom/roomql/runtime/JoinType;Lkotlin/jvm/functions/Function1;)V
 	public final fun limit (I)V
 	public final fun offset (I)V
-	public final fun orderBy (Lcom/roomql/runtime/Column;Lcom/roomql/runtime/SortDirection;)V
+	public final fun orderBy (Lcom/roomql/runtime/Expression;Lcom/roomql/runtime/SortDirection;)V
 	public final fun where (Lkotlin/jvm/functions/Function1;)V
 }
 
@@ -106,5 +121,35 @@ public final class com/roomql/runtime/SortDirection : java/lang/Enum {
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public static fun valueOf (Ljava/lang/String;)Lcom/roomql/runtime/SortDirection;
 	public static fun values ()[Lcom/roomql/runtime/SortDirection;
+}
+
+public final class com/roomql/runtime/WhereScope : com/roomql/runtime/ConditionScope {
+	public fun <init> ()V
+	public final fun between (Lcom/roomql/runtime/Column;Ljava/lang/Object;Ljava/lang/Object;)V
+	public final fun contains (Lcom/roomql/runtime/Column;Ljava/lang/String;)V
+	public final fun containsIfNotNull (Lcom/roomql/runtime/Column;Ljava/lang/String;)V
+	public final fun eq (Lcom/roomql/runtime/Column;Ljava/lang/Object;)V
+	public final fun eqIfNotNull (Lcom/roomql/runtime/Column;Ljava/lang/Object;)V
+	public final fun gt (Lcom/roomql/runtime/Column;Ljava/lang/Object;)V
+	public final fun gtIfNotNull (Lcom/roomql/runtime/Column;Ljava/lang/Object;)V
+	public final fun gte (Lcom/roomql/runtime/Column;Ljava/lang/Object;)V
+	public final fun gteIfNotNull (Lcom/roomql/runtime/Column;Ljava/lang/Object;)V
+	public final fun inList (Lcom/roomql/runtime/Column;Ljava/util/List;)V
+	public final fun inListIfNotEmpty (Lcom/roomql/runtime/Column;Ljava/util/List;)V
+	public final fun isNotNull (Lcom/roomql/runtime/Column;)V
+	public final fun isNull (Lcom/roomql/runtime/Column;)V
+	public final fun like (Lcom/roomql/runtime/Column;Ljava/lang/String;)V
+	public final fun likeIfNotNull (Lcom/roomql/runtime/Column;Ljava/lang/String;)V
+	public final fun lt (Lcom/roomql/runtime/Column;Ljava/lang/Object;)V
+	public final fun ltIfNotNull (Lcom/roomql/runtime/Column;Ljava/lang/Object;)V
+	public final fun lte (Lcom/roomql/runtime/Column;Ljava/lang/Object;)V
+	public final fun lteIfNotNull (Lcom/roomql/runtime/Column;Ljava/lang/Object;)V
+	public final fun notEq (Lcom/roomql/runtime/Column;Ljava/lang/Object;)V
+	public final fun notEqIfNotNull (Lcom/roomql/runtime/Column;Ljava/lang/Object;)V
+	public final fun notInList (Lcom/roomql/runtime/Column;Ljava/util/List;)V
+	public final fun notInListIfNotEmpty (Lcom/roomql/runtime/Column;Ljava/util/List;)V
+	public final fun notLike (Lcom/roomql/runtime/Column;Ljava/lang/String;)V
+	public final fun notLikeIfNotNull (Lcom/roomql/runtime/Column;Ljava/lang/String;)V
+	public final fun or (Lkotlin/jvm/functions/Function1;)V
 }
 

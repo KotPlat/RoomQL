@@ -6,7 +6,17 @@ All notable changes to **RoomQL** are documented here. The format follows
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- **Aggregate functions**: `count`, `countAll`, `sum`, `avg`, `min`, `max` as `Expression<T>`
+  factories, usable in `having { }` and `orderBy`. `count`/`countAll` are kept separate because
+  they differ under a `LEFT JOIN`; `sum`/`avg` are constrained to numeric columns. See #72.
+
+### Changed — breaking
+
+- **`Expression<T>` becomes the root type behind `having { }` and `orderBy`**, with `Column<T>`
+  implementing it. `where { }`'s operators and `groupBy()` deliberately stay `Column<T>`-only —
+  SQL forbids aggregates in both positions. See #71.
 
 ## [2.0.0] - 2026-09-19
 

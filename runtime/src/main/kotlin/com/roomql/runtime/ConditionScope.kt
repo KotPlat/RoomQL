@@ -1,7 +1,12 @@
 package com.roomql.runtime
 
 /**
- * The receiver inside `where { }` and `having { }`.
+ * Common base for [WhereScope] and [HavingScope]: accumulates the [Condition]s built by their
+ * infix operators, then collapses them into one AND-combined [Condition] via [build].
+ *
+ * [WhereScope] and [HavingScope] duplicate the same operator set on different receiver bounds
+ * ([Column] vs [Expression]) because Kotlin can't express "whatever bound this scope has" as a
+ * shared type parameter.
  *
  * Every value-taking operator comes in two forms, and which one you call is how you say
  * whether the filter is mandatory or optional:
@@ -21,7 +26,7 @@ package com.roomql.runtime
  * Note that an absent optional filter is *removed*, not matched against `NULL`. Every SQL
  * comparison involving `NULL` is never true — `age >= NULL` and even `age <> NULL` match
  * no rows at all — so a condition that cannot be satisfied is never what an absent filter
- * should mean. Use [isNull] or [isNotNull] when you want SQL `NULL` itself.
+ * should mean. Use `isNull` or `isNotNull` when you want SQL `NULL` itself.
  *
  * The required operators take `T & Any` rather than `T`, so an ordinary nullable Kotlin
  * value fails to compile. That covers callers inside the type system; it does not cover a
@@ -33,26 +38,29 @@ package com.roomql.runtime
  * against it separately.
  */
 @RoomQlDsl
-public class ConditionScope {
+public sealed class ConditionScope {
     internal val conditions = mutableListOf<Condition>()
 
-    private fun add(condition: Condition) {
+    internal fun add(condition: Condition) {
         if (condition !is Condition.Empty) conditions.add(condition)
     }
+
+    internal fun build(): Condition = conditions.toCondition()
+}
+
+/** The receiver inside `where { }` — accepts [Column]s only; aggregates are invalid SQL here. */
+@RoomQlDsl
+public class WhereScope : ConditionScope() {
 
     /**
      * Groups alternatives. The group is parenthesised and combined with the surrounding
      * conditions by `AND`. A group whose conditions all skip contributes nothing, so no
      * empty `()` is emitted.
      */
-    public fun or(block: ConditionScope.() -> Unit) {
-        val scope = ConditionScope().apply(block)
+    public fun or(block: WhereScope.() -> Unit) {
+        val scope = WhereScope().apply(block)
         if (scope.conditions.isNotEmpty()) add(Condition.Or(scope.conditions))
     }
-
-    internal fun build(): Condition = conditions.toCondition()
-
-    // Operators are extension functions so they register themselves in the enclosing scope.
 
     // ---- Comparisons: required ----
 
@@ -167,6 +175,107 @@ public class ConditionScope {
      * which applies whichever bounds are present and has no hidden case.
      */
     public fun <T> Column<T>.between(lower: T & Any, upper: T & Any): Unit =
+        add(Condition.Simple(this, "%s BETWEEN ? AND ?", listOf(lower, upper)))
+}
+
+/** The receiver inside `having { }` — accepts any [Expression], columns and aggregates alike. */
+@RoomQlDsl
+public class HavingScope : ConditionScope() {
+
+    /** See [WhereScope.or] — same grouping behaviour, scoped to [HavingScope]. */
+    public fun or(block: HavingScope.() -> Unit) {
+        val scope = HavingScope().apply(block)
+        if (scope.conditions.isNotEmpty()) add(Condition.Or(scope.conditions))
+    }
+
+    // ---- Comparisons: required ----
+
+    public infix fun <T> Expression<T>.eq(value: T & Any): Unit =
+        add(Condition.Simple(this, "%s = ?", listOf(value)))
+
+    public infix fun <T> Expression<T>.notEq(value: T & Any): Unit =
+        add(Condition.Simple(this, "%s != ?", listOf(value)))
+
+    public infix fun <T> Expression<T>.gt(value: T & Any): Unit =
+        add(Condition.Simple(this, "%s > ?", listOf(value)))
+
+    public infix fun <T> Expression<T>.gte(value: T & Any): Unit =
+        add(Condition.Simple(this, "%s >= ?", listOf(value)))
+
+    public infix fun <T> Expression<T>.lt(value: T & Any): Unit =
+        add(Condition.Simple(this, "%s < ?", listOf(value)))
+
+    public infix fun <T> Expression<T>.lte(value: T & Any): Unit =
+        add(Condition.Simple(this, "%s <= ?", listOf(value)))
+
+    // ---- Comparisons: skipped when the value is absent ----
+
+    public infix fun <T> Expression<T>.eqIfNotNull(value: T?): Unit =
+        skipIfNull(value) { this eq it }
+
+    public infix fun <T> Expression<T>.notEqIfNotNull(value: T?): Unit =
+        skipIfNull(value) { this notEq it }
+
+    public infix fun <T> Expression<T>.gtIfNotNull(value: T?): Unit =
+        skipIfNull(value) { this gt it }
+
+    public infix fun <T> Expression<T>.gteIfNotNull(value: T?): Unit =
+        skipIfNull(value) { this gte it }
+
+    public infix fun <T> Expression<T>.ltIfNotNull(value: T?): Unit =
+        skipIfNull(value) { this lt it }
+
+    public infix fun <T> Expression<T>.lteIfNotNull(value: T?): Unit =
+        skipIfNull(value) { this lte it }
+
+    // ---- Text matching ----
+
+    public infix fun <T : String?> Expression<T>.like(value: String): Unit =
+        add(Condition.Simple(this, "%s LIKE ?", listOf(value)))
+
+    public infix fun <T : String?> Expression<T>.notLike(value: String): Unit =
+        add(Condition.Simple(this, "%s NOT LIKE ?", listOf(value)))
+
+    public infix fun <T : String?> Expression<T>.contains(value: String): Unit =
+        add(Condition.Simple(this, "%s LIKE ?", listOf("%$value%")))
+
+    public infix fun <T : String?> Expression<T>.likeIfNotNull(value: String?): Unit =
+        skipIfNull(value) { this like it }
+
+    public infix fun <T : String?> Expression<T>.notLikeIfNotNull(value: String?): Unit =
+        skipIfNull(value) { this notLike it }
+
+    public infix fun <T : String?> Expression<T>.containsIfNotNull(value: String?): Unit =
+        skipIfNull(value) { this contains it }
+
+    // ---- Null checks: these take no value and never skip ----
+
+    public fun <T> Expression<T>.isNull(): Unit =
+        add(Condition.Simple(this, "%s IS NULL", emptyList()))
+
+    public fun <T> Expression<T>.isNotNull(): Unit =
+        add(Condition.Simple(this, "%s IS NOT NULL", emptyList()))
+
+    // ---- Set membership ----
+
+    /** See [WhereScope.inList] for what an empty [values] renders. */
+    public infix fun <T> Expression<T>.inList(values: List<T & Any>): Unit =
+        add(Condition.Simple(this, "%s IN (${values.placeholders()})", values))
+
+    /** See [WhereScope.notInList] for what an empty [values] renders. */
+    public infix fun <T> Expression<T>.notInList(values: List<T & Any>): Unit =
+        add(Condition.Simple(this, "%s NOT IN (${values.placeholders()})", values))
+
+    public infix fun <T> Expression<T>.inListIfNotEmpty(values: List<T & Any>?): Unit =
+        skipIfEmpty(values) { this inList it }
+
+    public infix fun <T> Expression<T>.notInListIfNotEmpty(values: List<T & Any>?): Unit =
+        skipIfEmpty(values) { this notInList it }
+
+    // ---- Ranges ----
+
+    /** See [WhereScope.between] for why there is deliberately no `betweenIfNotNull`. */
+    public fun <T> Expression<T>.between(lower: T & Any, upper: T & Any): Unit =
         add(Condition.Simple(this, "%s BETWEEN ? AND ?", listOf(lower, upper)))
 }
 

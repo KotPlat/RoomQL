@@ -148,7 +148,7 @@ RoomQL's entire public surface, across all three artifacts. Signatures, generic 
 |---|---|---|
 | [`query { }`](docs/API.md#query) | runtime | Entry point. Builds and returns a `RoomQlQuery`. |
 | [`QueryBuilder`](docs/API.md#querybuilder) | runtime | Receiver inside `query { }`: `from`, `join`, `where`, `groupBy`, `having`, `orderBy`, `limit`, `offset`, `build`. |
-| [`ConditionScope`](docs/API.md#conditionscope-the-condition-operators) | runtime | Receiver inside `where { }` / `having { }`. Carries every operator below, plus `or { }` for alternatives. |
+| [`WhereScope`, `HavingScope`](docs/API.md#wherescope-and-havingscope-the-condition-operators) | runtime | Receivers inside `where { }` (`Column<T>`-only) and `having { }` (any `Expression<T>`, aggregates included). Both carry every operator below, plus `or { }` for alternatives. |
 | `eq`, `notEq`, `gt`, `gte`, `lt`, `lte` | runtime | Comparisons. Required — a nullable value will not compile. |
 | `eqIfNotNull`, `notEqIfNotNull`, `gtIfNotNull`, `gteIfNotNull`, `ltIfNotNull`, `lteIfNotNull` | runtime | The optional forms. Skip when the value is `null`. |
 | `like`, `notLike`, `contains` | runtime | Text matching on `String` columns. Required. `contains` adds the `%` wildcards for you. |
@@ -158,6 +158,7 @@ RoomQL's entire public surface, across all three artifacts. Signatures, generic 
 | `between` | runtime | Range. Both bounds required — compose `gteIfNotNull` + `lteIfNotNull` for a half-open range. |
 | `isNull`, `isNotNull` | runtime | SQL `NULL` checks — the two operators that never skip. |
 | [`Column<T>`](docs/API.md#column) | runtime | A typed column reference. Generated per entity property, never hand-written. |
+| [`count`, `countAll`, `sum`, `avg`, `min`, `max`](docs/API.md#aggregate-functions) | runtime | `Expression<T>` factories for `having { }` and `orderBy`. `count`/`countAll` differ under a `LEFT JOIN`; `sum`/`avg` require a numeric column. |
 | [`EntityTable`](docs/API.md#entitytable) | runtime | Implemented by every generated `*Table`: `tableName`, `allColumnNames`. |
 | [`RoomQlQuery`](docs/API.md#roomqlquery) | runtime | The DSL's output: `sql` plus positional `args`. Pure JVM — assert on it in unit tests. |
 | [`JoinType`](docs/API.md#jointype-and-sortdirection) / [`SortDirection`](docs/API.md#jointype-and-sortdirection) | runtime | `INNER`/`LEFT`, and `ASC`/`DESC`. |
