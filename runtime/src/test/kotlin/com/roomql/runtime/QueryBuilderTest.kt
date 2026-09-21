@@ -393,6 +393,16 @@ class QueryBuilderTest {
     }
 
     @Test
+    fun `repeated groupBy calls are additive`() {
+        val result = query {
+            from("users")
+            groupBy(Column<String>("status", "users"))
+            groupBy(Column<String>("region", "users"))
+        }
+        assertEquals("SELECT * FROM users GROUP BY status, region", result.sql)
+    }
+
+    @Test
     fun `groupBy with having produces HAVING clause`() {
         val result = query {
             from("users")
