@@ -4,12 +4,9 @@ package com.roomql.runtime
  * Common base for [WhereScope] and [HavingScope]: accumulates the [Condition]s built by their
  * infix operators, then collapses them into one AND-combined [Condition] via [build].
  *
- * The two subclasses declare the same operator set (`eq`, `gt`, `like`, ...) but on different
- * receiver bounds — [WhereScope] on [Column], [HavingScope] on [Expression] — because SQL
- * forbids aggregates in `WHERE` (evaluated before grouping exists). Kotlin has no way to share
- * that operator set generically here: a type parameter bounded by another type parameter can't
- * carry an additional bound, so there is no single `X` that can mean "whatever this scope
- * allows, further narrowed to this call's value type." Hence two classes, not one generic one.
+ * [WhereScope] and [HavingScope] duplicate the same operator set on different receiver bounds
+ * ([Column] vs [Expression]) because Kotlin can't express "whatever bound this scope has" as a
+ * shared type parameter.
  *
  * Every value-taking operator comes in two forms, and which one you call is how you say
  * whether the filter is mandatory or optional:

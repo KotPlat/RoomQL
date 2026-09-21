@@ -6,7 +6,11 @@ All notable changes to **RoomQL** are documented here. The format follows
 
 ## [Unreleased]
 
-_Nothing yet._
+### Changed — breaking
+
+- **`Expression<T>` becomes the root type behind `having { }` and `orderBy`**, with `Column<T>`
+  implementing it. `where { }`'s operators and `groupBy()` deliberately stay `Column<T>`-only —
+  SQL forbids aggregates in both positions. See #71.
 
 ## [2.0.0] - 2026-09-19
 

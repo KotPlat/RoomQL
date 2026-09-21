@@ -18,6 +18,9 @@ import kotlin.test.assertTrue
  * Similarly, `like`/`notLike`/`contains` are constrained to `Column<T : String?>`, which is also
  * a compile-time-only guarantee. Verified manually: `Column<Int>("age", "users") like "A%"` fails
  * `:runtime:compileKotlin` with "Unresolved reference. ... receiver type mismatch."
+ *
+ * `where { }`'s operators are likewise restricted to `Column`, not `Expression` — verified
+ * manually: `where { (someExpression: Expression<Int>) gt 18 }` fails to resolve `gt`.
  */
 class QueryBuilderTest {
 
@@ -333,6 +336,16 @@ class QueryBuilderTest {
         assertEquals("SELECT * FROM users ORDER BY last_name ASC, first_name ASC", result.sql)
     }
 
+    @Test
+    fun `orderBy accepts a value only typed as Expression`() {
+        val nameExpression: Expression<String> = Column<String>("name", "users")
+        val result = query {
+            from("users")
+            orderBy(nameExpression, SortDirection.ASC)
+        }
+        assertEquals("SELECT * FROM users ORDER BY name ASC", result.sql)
+    }
+
     // --- LIMIT / OFFSET ---
 
     @Test
@@ -385,6 +398,18 @@ class QueryBuilderTest {
             from("users")
             groupBy(Column<String>("status", "users"))
             having { Column<Int>("age", "users") gt 18 }
+        }
+        assertEquals("SELECT * FROM users GROUP BY status HAVING age > ?", result.sql)
+        assertEquals(listOf(18), result.args.toList())
+    }
+
+    @Test
+    fun `having accepts a value only typed as Expression`() {
+        val ageExpression: Expression<Int> = Column<Int>("age", "users")
+        val result = query {
+            from("users")
+            groupBy(Column<String>("status", "users"))
+            having { ageExpression gt 18 }
         }
         assertEquals("SELECT * FROM users GROUP BY status HAVING age > ?", result.sql)
         assertEquals(listOf(18), result.args.toList())
