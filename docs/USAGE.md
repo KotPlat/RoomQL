@@ -1,6 +1,6 @@
 # RoomQL Usage Guide — building dynamic Android Room queries in Kotlin
 
-Every operator in the **RoomQL 2.0.0** DSL, the SQL each one generates, and the idioms for joins, `Flow`, error handling, and testing. For the pitch, installation, API reference, and limitations, see the [main README](../README.md).
+Every operator in the **RoomQL** DSL, the SQL each one generates, and the idioms for joins, `Flow`, error handling, and testing. For the pitch, installation, API reference, and limitations, see the [main README](../README.md).
 
 RoomQL is a type-safe Kotlin DSL that builds a Room `@RawQuery` at runtime, so a search screen whose filters are chosen by the user needs neither `(:minAge IS NULL OR age >= :minAge)` string tricks nor one DAO method per filter combination. This guide assumes you have added the three artifacts — `runtime`, `runtime-android`, and `ksp-processor` (all under `io.github.kotplat.roomql`) — as shown in the [installation section](../README.md#installation).
 

@@ -4,24 +4,13 @@ All notable changes to **RoomQL** are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and RoomQL follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.0] - Unreleased
 
 ### Added
 
 - **Aggregate functions**: `count`, `countAll`, `sum`, `avg`, `min`, `max` as `Expression<T>`
   factories, usable in `having { }` and `orderBy`. `count`/`countAll` are kept separate because
   they differ under a `LEFT JOIN`; `sum`/`avg` are constrained to numeric columns. See #72.
-
-### Changed — breaking
-
-- **`Expression<T>` becomes the root type behind `having { }` and `orderBy`**, with `Column<T>`
-  implementing it. `where { }`'s operators and `groupBy()` deliberately stay `Column<T>`-only —
-  SQL forbids aggregates in both positions. See #71.
-
-## [2.0.0] - 2026-09-19
-
-### Added
-
 - **Maven Central publishing.** All three artifacts publish under a new groupId,
   `io.github.kotplat.roomql`, with `roomql-` prefixes dropped from the artifactIds
   (`roomql-runtime` → `runtime`, `roomql-runtime-android` → `runtime-android`,
@@ -33,6 +22,10 @@ All notable changes to **RoomQL** are documented here. The format follows
   manual review — publishing itself stays a deliberate human step. See #66.
 
 ### Changed — breaking
+
+- **`Expression<T>` becomes the root type behind `having { }` and `orderBy`**, with `Column<T>`
+  implementing it. `where { }`'s operators and `groupBy()` deliberately stay `Column<T>`-only —
+  SQL forbids aggregates in both positions. See #71.
 
 - **Every value-taking condition operator splits into a required and an optional form.**
   `eq`, `gte`, `like`, `inList`, `between`, and the rest now take `T & Any` and will not
@@ -127,5 +120,4 @@ Annotation-driven DAO generation. KSP cannot read function bodies, so the query 
 [#6](https://github.com/KotPlat/RoomQL/issues/6) and
 [#13](https://github.com/KotPlat/RoomQL/issues/13).
 
-[2.0.0]: https://github.com/KotPlat/RoomQL/releases/tag/2.0.0
 [1.0.0]: https://github.com/KotPlat/RoomQL/releases/tag/1.0.0

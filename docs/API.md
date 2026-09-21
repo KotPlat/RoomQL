@@ -1,6 +1,6 @@
 # RoomQL API Reference
 
-Every public type, function, and operator in **RoomQL 2.0.0** — the type-safe Kotlin DSL for building dynamic Android Room queries — with the SQL each one generates. For worked examples see the [Usage Guide](USAGE.md); for installation and the overall pitch see the [main README](../README.md).
+Every public type, function, and operator in **RoomQL** — the type-safe Kotlin DSL for building dynamic Android Room queries — with the SQL each one generates. For worked examples see the [Usage Guide](USAGE.md); for installation and the overall pitch see the [main README](../README.md).
 
 The public surface is deliberately small and is frozen by [Binary Compatibility Validator](https://github.com/Kotlin/binary-compatibility-validator), so everything RoomQL exposes is on this page.
 
