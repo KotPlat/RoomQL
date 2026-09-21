@@ -68,7 +68,7 @@ Add `io.github.kotplat.roomql:runtime` directly only if you want the DSL without
 |---|---|
 | Kotlin | 2.0.x |
 | KSP | `2.0.21-1.0.28` |
-| Room | 2.6.x – 2.7.x |
+| Room | 2.6.x |
 | Android | minSdk 21+ |
 | JDK | 17 |
 
@@ -230,7 +230,7 @@ Know these before adopting:
 - **`QueryBuilder` is not thread-safe.** Build a query on one thread or coroutine; never share a half-built builder.
 - **Validation is deferred to `build()`.** Missing `from()`, a non-positive `limit`, `offset` without `limit`, and `having` without `groupBy` all throw `RoomQlException` at build time, not while you configure.
 - **Whole-row selects only.** No projections, `DISTINCT`, aggregate expressions, multi-column `GROUP BY`, subqueries, or `UNION`.
-- **Room version range.** Targets Room 2.6.x–2.7.x (API 21+). Room 2.8 raised `minSdk` to 23; support is deferred.
+- **Room version range.** Targets Room 2.6.x (API 21+), the version pinned and tested in CI. Room 2.8 raised `minSdk` to 23; support is deferred.
 - **No auto-generated JOIN result types.** You supply your own result class — by design, so you control its shape.
 
 ## Modules
