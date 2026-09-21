@@ -14,6 +14,7 @@ The public surface is deliberately small and is frozen by [Binary Compatibility 
   - [WhereScope and HavingScope: the condition operators](#wherescope-and-havingscope-the-condition-operators)
   - [JoinScope and JoinConditionScope](#joinscope-and-joinconditionscope)
   - [Column](#column)
+  - [Aggregate functions](#aggregate-functions)
   - [EntityTable](#entitytable)
   - [RoomQlQuery](#roomqlquery)
   - [JoinType and SortDirection](#jointype-and-sortdirection)
@@ -140,6 +141,30 @@ public data class Column<T>(val columnName: String, val tableName: String)
 ```
 
 A typed reference to one SQL column. You do not construct these — the KSP processor generates one per entity property, and `T` carries the property's Kotlin type (including nullability) so that operators type-check against it.
+
+### Aggregate functions
+
+```kotlin
+public fun count(column: Expression<*>): Expression<Long>
+public fun countAll(): Expression<Long>
+public fun <T : Number?> sum(column: Expression<T>): Expression<T?>
+public fun <T : Number?> avg(column: Expression<T>): Expression<Double?>
+public fun <T> min(column: Expression<T>): Expression<T?>
+public fun <T> max(column: Expression<T>): Expression<T?>
+```
+
+Each returns an `Expression<T>`, so the result can be used anywhere `having { }` or `orderBy` accepts one — including compared against a value or combined with other conditions, same as a `Column`:
+
+```kotlin
+query {
+    from(OrdersTable)
+    groupBy(OrdersTable.customerId)
+    having { count(OrdersTable.id) gt 5 }
+    orderBy(sum(OrdersTable.amount), SortDirection.DESC)
+}
+```
+
+`count` and `countAll` are deliberately separate: under a `LEFT JOIN`, `COUNT(column)` yields 0 for an unmatched row, while `COUNT(*)` yields 1. `sum` and `avg` are constrained to numeric column types; `avg` always returns `Double?` regardless of the input numeric type, matching SQL's own `AVG`. All six aggregate results are nullable, since SQL returns `NULL` for an empty group.
 
 ### EntityTable
 

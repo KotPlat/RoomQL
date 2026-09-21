@@ -129,6 +129,7 @@ private const val SQL_OR = " OR "
 /** Qualifies a column with its table name only when the column name collides across the joined tables. */
 private fun Expression<*>.render(collidingNames: Set<String>): String = when (this) {
     is Column<*> -> if (columnName in collidingNames) "$tableName.$columnName" else columnName
+    is AggregateExpression<*> -> "$sqlFunction(${operand?.render(collidingNames) ?: "*"})"
 }
 
 private fun renderCondition(condition: Condition, args: MutableList<Any?>, sb: StringBuilder, collidingNames: Set<String>) {

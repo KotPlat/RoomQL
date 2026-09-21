@@ -1,3 +1,12 @@
+public final class com/roomql/runtime/AggregateKt {
+	public static final fun avg (Lcom/roomql/runtime/Expression;)Lcom/roomql/runtime/Expression;
+	public static final fun count (Lcom/roomql/runtime/Expression;)Lcom/roomql/runtime/Expression;
+	public static final fun countAll ()Lcom/roomql/runtime/Expression;
+	public static final fun max (Lcom/roomql/runtime/Expression;)Lcom/roomql/runtime/Expression;
+	public static final fun min (Lcom/roomql/runtime/Expression;)Lcom/roomql/runtime/Expression;
+	public static final fun sum (Lcom/roomql/runtime/Expression;)Lcom/roomql/runtime/Expression;
+}
+
 public final class com/roomql/runtime/Column : com/roomql/runtime/Expression {
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
 	public final fun component1 ()Ljava/lang/String;
