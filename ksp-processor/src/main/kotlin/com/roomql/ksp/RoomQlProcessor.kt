@@ -36,6 +36,7 @@ private const val DEFAULT_TABLE_SUFFIX = "Table"
 private val COLUMN_CLASS = ClassName("com.roomql.runtime", "Column")
 private val ENTITY_TABLE_CLASS = ClassName("com.roomql.runtime", "EntityTable")
 private val EXPRESSION_CLASS = ClassName("com.roomql.runtime", "Expression")
+private val SELECT_ITEM_CLASS = ClassName("com.roomql.runtime", "SelectItem")
 private val ALIAS_MEMBER = MemberName("com.roomql.runtime", "alias")
 
 internal class RoomQlProcessor(private val environment: SymbolProcessorEnvironment) : SymbolProcessor {
@@ -125,7 +126,7 @@ internal class RoomQlProcessor(private val environment: SymbolProcessorEnvironme
             val columnName = if (property != null) extractColumnName(property) else extractColumnName(param)
             param to columnName
         }
-        val returnType = ARRAY.parameterizedBy(EXPRESSION_CLASS.parameterizedBy(STAR))
+        val returnType = ARRAY.parameterizedBy(SELECT_ITEM_CLASS.parameterizedBy(STAR))
 
         val body = CodeBlock.builder().apply {
             add("return arrayOf(\n")

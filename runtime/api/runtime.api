@@ -28,7 +28,7 @@ public abstract interface class com/roomql/runtime/EntityTable {
 	public abstract fun getTableName ()Ljava/lang/String;
 }
 
-public abstract interface class com/roomql/runtime/Expression {
+public abstract interface class com/roomql/runtime/Expression : com/roomql/runtime/SelectItem {
 }
 
 public final class com/roomql/runtime/HavingScope : com/roomql/runtime/ConditionScope {
@@ -83,7 +83,7 @@ public abstract interface annotation class com/roomql/runtime/Projection : java/
 }
 
 public final class com/roomql/runtime/ProjectionKt {
-	public static final fun alias (Lcom/roomql/runtime/Expression;Ljava/lang/String;)Lcom/roomql/runtime/Expression;
+	public static final fun alias (Lcom/roomql/runtime/Expression;Ljava/lang/String;)Lcom/roomql/runtime/SelectItem;
 }
 
 public final class com/roomql/runtime/QueryBuilder {
@@ -97,7 +97,7 @@ public final class com/roomql/runtime/QueryBuilder {
 	public final fun limit (I)V
 	public final fun offset (I)V
 	public final fun orderBy (Lcom/roomql/runtime/Expression;Lcom/roomql/runtime/SortDirection;)V
-	public final fun select ([Lcom/roomql/runtime/Expression;)V
+	public final fun select ([Lcom/roomql/runtime/SelectItem;)V
 	public final fun where (Lkotlin/jvm/functions/Function1;)V
 }
 
@@ -121,6 +121,9 @@ public final class com/roomql/runtime/RoomQlQuery {
 	public final fun getSql ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/roomql/runtime/SelectItem {
 }
 
 public final class com/roomql/runtime/SortDirection : java/lang/Enum {

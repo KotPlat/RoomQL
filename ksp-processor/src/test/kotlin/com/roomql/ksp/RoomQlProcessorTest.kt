@@ -198,7 +198,7 @@ class RoomQlProcessorTest {
         assertTrue("categoryId: Expression<Int>" in generated)
         assertTrue("categoryName: Expression<String>" in generated)
         assertTrue("productCount: Expression<Long>" in generated)
-        assertTrue("Array<Expression<*>>" in generated)
+        assertTrue("Array<SelectItem<*>>" in generated)
     }
 
     @Test

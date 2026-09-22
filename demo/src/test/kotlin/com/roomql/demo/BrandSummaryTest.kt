@@ -67,6 +67,6 @@ class BrandSummaryTest {
         assertTrue(sql.contains("GROUP BY"))
         assertTrue(sql.contains("COUNT("))
         assertTrue(sql.contains("AVG("))
-        assertTrue(sql.contains("AS brand_name"))
+        assertTrue(sql.contains("AS `brand_name`"))
     }
 }

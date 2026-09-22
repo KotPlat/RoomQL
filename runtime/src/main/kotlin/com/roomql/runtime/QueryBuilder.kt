@@ -23,7 +23,7 @@ public class QueryBuilder {
     private var offsetValue: Int? = null
     private val groupByColumns = mutableListOf<Column<*>>()
     private var havingScope: HavingScope? = null
-    private val selectExpressions = mutableListOf<Expression<*>>()
+    private val selectItems = mutableListOf<SelectItem<*>>()
 
     /**
      * Sets the primary table by its raw SQL name. Carries no column metadata, so [build]
@@ -110,16 +110,16 @@ public class QueryBuilder {
     /**
      * Projects specific columns and aggregates instead of whole rows. Left out entirely,
      * [build] renders `SELECT *` with automatic `JOIN`-collision aliasing; calling this even
-     * once switches that off — [expressions] becomes the complete, explicit set of returned
+     * once switches that off — [items] becomes the complete, explicit set of returned
      * columns. Repeated calls accumulate rather than replace, so the arguments across every
      * call form one projection list.
      *
-     * [build] rejects two shapes that would otherwise let SQLite pick an arbitrary row's value
-     * silently: a grouped projection with a bare [Column] missing from [groupBy], and an
-     * ungrouped projection mixing an aggregate with a bare column.
+     * [build] rejects shapes that would otherwise map the wrong value silently: a grouped
+     * projection with a bare [Column] missing from [groupBy], an ungrouped projection mixing an
+     * aggregate with a bare column, and two items sharing one output name.
      */
-    public fun select(vararg expressions: Expression<*>) {
-        selectExpressions.addAll(expressions)
+    public fun select(vararg items: SelectItem<*>) {
+        selectItems.addAll(items)
     }
 
     /**
@@ -144,9 +144,9 @@ public class QueryBuilder {
         val collidingNames = collidingColumnNames()
         val args = mutableListOf<Any?>()
         val sql = buildString {
-            if (selectExpressions.isNotEmpty()) {
+            if (selectItems.isNotEmpty()) {
                 append("SELECT ")
-                append(selectExpressions.joinToString(", ") { it.render(collidingNames) })
+                append(selectItems.joinToString(", ") { it.renderSelectItem(collidingNames) })
             } else if (joins.isNotEmpty() && entityTable != null) {
                 appendSelectWithAliasing(entityTable, joins, collidingNames)
             } else {
@@ -190,22 +190,27 @@ public class QueryBuilder {
         return RoomQlQuery(sql, args)
     }
 
-    /** Rejects a select { } that would let SQLite pick an arbitrary row's value silently. */
+    /** Rejects a select(...) that would let Room or SQLite map the wrong value silently. */
     private fun checkSelectProjection() {
-        if (selectExpressions.isEmpty()) return
-        val unwrapped = selectExpressions.map { if (it is AliasedExpression<*>) it.expression else it }
-        val bareColumns = unwrapped.filterIsInstance<Column<*>>()
-        val hasAggregate = unwrapped.any { it is AggregateExpression<*> }
+        if (selectItems.isEmpty()) return
+        val expressions = selectItems.map { it.unaliased() }
+        val bareColumns = expressions.filterIsInstance<Column<*>>()
+        val hasAggregate = expressions.any { it is AggregateExpression<*> }
         if (groupByColumns.isNotEmpty()) {
             val ungrouped = bareColumns.filter { it !in groupByColumns }
             roomQlCheck(ungrouped.isEmpty()) {
-                "select { } column(s) not in groupBy(): ${ungrouped.joinToString { it.columnName }}"
+                "select(...) column(s) not in groupBy(): ${ungrouped.joinToString { it.columnName }}"
             }
         } else {
             roomQlCheck(!(hasAggregate && bareColumns.isNotEmpty())) {
-                "select { } cannot mix an aggregate with a bare column unless groupBy() is set"
+                "select(...) cannot mix an aggregate with a bare column unless groupBy() is set"
             }
         }
+
+        val badAliases = selectItems.filterIsInstance<AliasedExpression<*>>().map { it.alias }.filter { '`' in it }
+        roomQlCheck(badAliases.isEmpty()) { "alias() names cannot contain a backtick: ${badAliases.joinToString()}" }
+        val duplicates = selectItems.mapNotNull { it.outputName() }.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
+        roomQlCheck(duplicates.isEmpty()) { "select(...) returns more than one column named: ${duplicates.joinToString()}; alias all but one" }
     }
 
     /** Column names shared by more than one table in this query's FROM + JOINs. Empty when there are no joins. */
@@ -228,7 +233,24 @@ private const val SQL_OR = " OR "
 private fun Expression<*>.render(collidingNames: Set<String>): String = when (this) {
     is Column<*> -> if (columnName in collidingNames) "$tableName.$columnName" else columnName
     is AggregateExpression<*> -> "$sqlFunction(${operand?.render(collidingNames) ?: "*"})"
-    is AliasedExpression<*> -> "${expression.render(collidingNames)} AS $alias"
+}
+
+// Quoted so a reserved word (`order`, `group`) still works as an alias; SQLite reports the name unquoted.
+private fun SelectItem<*>.renderSelectItem(collidingNames: Set<String>): String = when (this) {
+    is Expression<*> -> render(collidingNames)
+    is AliasedExpression<*> -> "${expression.render(collidingNames)} AS `$alias`"
+}
+
+private fun SelectItem<*>.unaliased(): Expression<*> = when (this) {
+    is Expression<*> -> this
+    is AliasedExpression<*> -> expression
+}
+
+/** The column name Room sees for this item, or null for an unaliased aggregate. */
+private fun SelectItem<*>.outputName(): String? = when (this) {
+    is Column<*> -> columnName
+    is AggregateExpression<*> -> null
+    is AliasedExpression<*> -> alias
 }
 
 private fun renderCondition(condition: Condition, args: MutableList<Any?>, sb: StringBuilder, collidingNames: Set<String>) {
