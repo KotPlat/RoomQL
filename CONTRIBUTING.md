@@ -73,6 +73,16 @@ Every change needs a test.
   what the pure-JVM split is for, so no test there should need Android.
 - KSP changes: `:ksp-processor` tests compile a source snippet and assert on the generated output.
 - Anything touching the Room boundary: add a `:sample` test that runs the query against in-memory Room.
+  
+## Before a release
+
+CI only builds against the pinned toolchain (Kotlin 2.0.21, KSP1, Room 2.6.1). Before tagging a release, check the newer toolchains the README claims:
+
+```bash
+./scripts/verify-toolchains.sh
+```
+
+It publishes this checkout to Maven local under a throwaway version, then builds and tests the demo on each toolchain listed at the top of the script. That takes a few minutes, which is why it isn't a PR gate. If one fails, fix it or drop that version from the README's requirements table.
 
 ## Commit messages
 

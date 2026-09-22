@@ -67,11 +67,12 @@ Add `io.github.kotplat.roomql:runtime` directly only if you want the DSL without
 
 | Dependency | Version |
 |---|---|
-| Kotlin | 2.0.x |
-| KSP | `2.0.21-1.0.28` |
-| Room | 2.6.x – 2.7.x |
+| Kotlin | 2.0.21 or newer (tested on 2.0.21, 2.1.21, and 2.2.0) |
+| KSP | The version matching your Kotlin. KSP1 and KSP2 both work. |
+| Room | 2.6.x – 2.7.x (KSP2 needs Room 2.7+) |
 | Android | minSdk 21+ |
-| JDK | 17 |
+| JDK (to run the build) | 17 or newer |
+| App Java target | Any on Android. Pure-JVM use of `runtime` needs Java 17+. |
 
 ## Minimal working example
 
