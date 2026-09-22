@@ -4,7 +4,7 @@
 
 <h1 align="center">RoomQL</h1>
 
-<p align="center"><b>A type-safe Kotlin DSL for building dynamic Android Room queries at runtime — no raw SQL strings, no reflection, no 2ⁿ DAO methods.</b></p>
+<p align="center"><b>A type-safe Kotlin DSL for Room queries whose structure — not just their filter values — is decided at runtime: which column to sort or group by, whether a join is even present.</b></p>
 
 <p align="center">
   <a href="https://central.sonatype.com/namespace/io.github.kotplat.roomql"><img src="https://img.shields.io/maven-central/v/io.github.kotplat.roomql/runtime?label=Maven%20Central&color=3DDC84" alt="Maven Central version"/></a>
@@ -19,6 +19,7 @@
   <a href="#minimal-working-example"><b>Quick start</b></a> &nbsp;·&nbsp;
   <a href="docs/USAGE.md"><b>Usage guide</b></a> &nbsp;·&nbsp;
   <a href="docs/API.md"><b>API reference</b></a> &nbsp;·&nbsp;
+  <a href="docs/CHEATSHEET.md"><b>Cheat sheet</b></a> &nbsp;·&nbsp;
   <a href="#how-roomql-compares-to-the-alternatives"><b>Comparison</b></a> &nbsp;·&nbsp;
   <a href="#faq"><b>FAQ</b></a> &nbsp;·&nbsp;
   <a href="CHANGELOG.md"><b>Changelog</b></a>
@@ -26,7 +27,7 @@
 
 ---
 
-Room has no good answer for a query whose filters are decided at runtime. Write it as a `@Query` string and you end up with `WHERE (:minAge IS NULL OR age >= :minAge)` repeated per filter, with column names the compiler never checks — rename a column and the query breaks *silently at runtime*. Write it as overloaded DAO methods and you need one method per filter combination, heading toward 2ⁿ. **RoomQL** builds the SQL programmatically instead: you keep Room's `@RawQuery`, a KSP processor generates a typed `Column<T>` for every column in your `@Entity` classes, and a `null` filter simply drops out of the generated SQL.
+A query whose **filter values** vary at runtime already has a fine static answer: `WHERE (:minAge IS NULL OR age >= :minAge)`, one `@Query`, one method, checked by Room at compile time. A query whose **structure** varies — which column to sort or group by, whether a join is present, which columns to project — is a harder problem: SQL can bind a *value* as a parameter, never an *identifier*, so a static `@Query` can only reach that with a `CASE`-expression ladder that gets unreadable fast, or can't reach it at all for a dynamic `SELECT` list. **RoomQL** replaces both problems with one typed DSL: a KSP processor generates a `Column<T>` for every column in your `@Entity` classes, so `orderBy`, `groupBy`, `join`, and `select` take real, rename-safe Kotlin symbols, and `where { }`'s null-skipping filters cover the values case in the same block. (Exactly which parts of "structure" are merely awkward in static SQL versus genuinely impossible is worth knowing precisely — see the [comparison](#how-roomql-compares-to-the-alternatives) below.)
 
 <p align="center">
   <img src="docs/null-drops-out.gif" alt="One query block; the generated SQL shrinks as each filter becomes null" width="900"/>
@@ -66,11 +67,12 @@ Add `io.github.kotplat.roomql:runtime` directly only if you want the DSL without
 
 | Dependency | Version |
 |---|---|
-| Kotlin | 2.0.x |
-| KSP | `2.0.21-1.0.28` |
-| Room | 2.6.x |
+| Kotlin | 2.0.21 or newer (tested on 2.0.21, 2.1.21, and 2.2.0) |
+| KSP | The version matching your Kotlin. KSP1 and KSP2 both work. |
+| Room | 2.6.x – 2.7.x (tested on 2.6.1 and 2.7.2; KSP2 needs Room 2.7+) |
 | Android | minSdk 21+ |
-| JDK | 17 |
+| JDK (to run the build) | 17 or newer |
+| App Java target | Any on Android. Pure-JVM use of `runtime` needs Java 17+. |
 
 ## Minimal working example
 
@@ -119,11 +121,32 @@ fun searchUsers(dao: UserDao, minAge: Int?, status: String?): List<UserEntity> {
 
 No `if` ladders, no `IS NULL OR` trick, and `UserEntityTable.age` is a real Kotlin symbol — rename the property or the column and the code stops compiling.
 
+### A case a static `@Query` makes you fight for
+
+Optional filter *values* have a static answer (`IS NULL OR`, shown above). A runtime-chosen sort *column* has one too, if you are willing to write it: `ORDER BY CASE WHEN :sortBy = 'age' THEN age WHEN :sortBy = 'name' THEN name END`, bound to a plain string. It works, and it is exactly the kind of SQL nobody wants to maintain once a second axis — an optional join, a filter — needs to vary alongside it. RoomQL replaces the `CASE` ladder with a typed argument:
+
+```kotlin
+fun sortedUsers(dao: UserDao, sortColumn: Column<*>, direction: SortDirection): List<UserEntity> {
+    val q = query {
+        from(UserEntityTable)
+        orderBy(sortColumn, direction)
+    }
+    return dao.search(q.toQuery())
+}
+
+sortedUsers(dao, UserEntityTable.age, SortDirection.DESC)
+sortedUsers(dao, UserEntityTable.name, SortDirection.ASC)
+```
+
+Both calls run through the same method with no branching, no `CASE` ladder, and `sortColumn` stays a real, rename-safe `Column<T>` the whole way. For a single fixed set of sortable columns, a `when (sortField) { AGE -> "age"; ... }` dispatch is a perfectly good zero-dependency alternative — RoomQL's edge shows up once this needs to compose with an optional join, a runtime `groupBy`, or a chosen `select(...)` projection at the same time, not from sorting alone.
+
 ## What you get
 
+- **Dynamic query structure, typed.** `orderBy`, `groupBy`, `join`, and `select` all take a real `Column<T>`/`Expression<T>` instead of a `CASE` ladder or a bare string. `select(...)`'s dynamic column list has no static SQL equivalent at all; the others do, but only as increasingly unreadable workarounds once more than one needs to vary together.
 - **Compile-time safety on column references.** `UserEntityTable.age` is generated from your entity by KSP. Renames and typos fail the build instead of the query.
 - **Optional filters that disappear, and say so.** `age gteIfNotNull minAge` drops the condition from the SQL when `minAge` is null; the plain `age gte minAge` is required and will not compile with a nullable value. Reading the operator name tells you which one you have.
-- **A real DSL, not string concatenation.** `where`, `or { }`, `orderBy`, `limit`/`offset`, `groupBy`/`having`, `join`. Values are bound as positional `?` parameters, so there is no injection surface.
+- **A real DSL, not string concatenation.** `where`, `or { }`, `orderBy`, `limit`/`offset`, `groupBy`/`having`, `select`, `join`. Values are bound as positional `?` parameters, so there is no injection surface.
+- **Aggregates and explicit projections.** `count`, `countAll`, `sum`, `avg`, `min`, `max` work in `having { }` and `orderBy`; `select(...)` projects them (or specific columns) instead of whole rows. `@Projection` generates a typed factory function for a multi-column result class, so a missing field is a compile error rather than a silently unmapped column.
 - **Automatic JOIN column aliasing.** Colliding column names across joined tables are aliased (`users.id AS users__id`) so a cursor never silently overwrites one column with another.
 - **Works with Room's own `@RawQuery`.** The output is a plain `SupportSQLiteQuery`. Blocking, `suspend`, and `Flow` return types all work — Room does the rest.
 
@@ -135,6 +158,7 @@ RoomQL's reference documentation lives alongside the code, not on a separate sit
 |---|---|
 | **[Usage Guide](docs/USAGE.md)** | Every capability as a worked example — entities, `@RawQuery` DAOs, AND/OR, optional filters, joins, `Flow`, error handling, testing — with the SQL each one generates. |
 | **[API Reference](docs/API.md)** | Every public type, function, and operator with its signature, generated SQL, and null-skipping behaviour. |
+| **[Cheat Sheet](docs/CHEATSHEET.md)** | A one-page, task-oriented lookup — "I want an optional numeric filter" → `gteIfNotNull` — faster than reading the full guide or reference. |
 | **[Changelog](CHANGELOG.md)** | What shipped in each release. |
 | **[Contributing](CONTRIBUTING.md)** | Build, test, and the `apiDump` step for public API changes. |
 
@@ -147,7 +171,7 @@ RoomQL's entire public surface, across all three artifacts. Signatures, generic 
 | Symbol | Artifact | What it does |
 |---|---|---|
 | [`query { }`](docs/API.md#query) | runtime | Entry point. Builds and returns a `RoomQlQuery`. |
-| [`QueryBuilder`](docs/API.md#querybuilder) | runtime | Receiver inside `query { }`: `from`, `join`, `where`, `groupBy`, `having`, `orderBy`, `limit`, `offset`, `build`. |
+| [`QueryBuilder`](docs/API.md#querybuilder) | runtime | Receiver inside `query { }`: `from`, `join`, `where`, `groupBy`, `having`, `select`, `orderBy`, `limit`, `offset`, `build`. |
 | [`WhereScope`, `HavingScope`](docs/API.md#wherescope-and-havingscope-the-condition-operators) | runtime | Receivers inside `where { }` (`Column<T>`-only) and `having { }` (any `Expression<T>`, aggregates included). Both carry every operator below, plus `or { }` for alternatives. |
 | `eq`, `notEq`, `gt`, `gte`, `lt`, `lte` | runtime | Comparisons. Required — a nullable value will not compile. |
 | `eqIfNotNull`, `notEqIfNotNull`, `gtIfNotNull`, `gteIfNotNull`, `ltIfNotNull`, `lteIfNotNull` | runtime | The optional forms. Skip when the value is `null`. |
@@ -158,7 +182,10 @@ RoomQL's entire public surface, across all three artifacts. Signatures, generic 
 | `between` | runtime | Range. Both bounds required — compose `gteIfNotNull` + `lteIfNotNull` for a half-open range. |
 | `isNull`, `isNotNull` | runtime | SQL `NULL` checks — the two operators that never skip. |
 | [`Column<T>`](docs/API.md#column) | runtime | A typed column reference. Generated per entity property, never hand-written. |
-| [`count`, `countAll`, `sum`, `avg`, `min`, `max`](docs/API.md#aggregate-functions) | runtime | `Expression<T>` factories for `having { }` and `orderBy`. `count`/`countAll` differ under a `LEFT JOIN`; `sum`/`avg` require a numeric column. |
+| [`count`, `countAll`, `sum`, `avg`, `min`, `max`](docs/API.md#aggregate-functions) | runtime | `Expression<T>` factories for `having { }`, `orderBy`, and `select`. `count`/`countAll` differ under a `LEFT JOIN`; `sum`/`avg` require a numeric column. |
+| [`select`](docs/API.md#projections) | runtime | Projects specific columns/aggregates instead of whole rows. Switches off automatic JOIN-collision aliasing when present. |
+| [`alias`](docs/API.md#projections) | runtime | Names an expression's output column as a `SelectItem`, accepted only by `select(...)` — the escape hatch for shapes `@Projection` can't model. |
+| [`@Projection`](docs/API.md#projections) | runtime / ksp-processor | Annotates a result data class; KSP generates `<ClassName>Projection(...)`, one typed `Expression<T>` parameter per property, to spread into `select(...)`. |
 | [`EntityTable`](docs/API.md#entitytable) | runtime | Implemented by every generated `*Table`: `tableName`, `allColumnNames`. |
 | [`RoomQlQuery`](docs/API.md#roomqlquery) | runtime | The DSL's output: `sql` plus positional `args`. Pure JVM — assert on it in unit tests. |
 | [`JoinType`](docs/API.md#jointype-and-sortdirection) / [`SortDirection`](docs/API.md#jointype-and-sortdirection) | runtime | `INNER`/`LEFT`, and `ASC`/`DESC`. |
@@ -168,22 +195,26 @@ RoomQL's entire public surface, across all three artifacts. Signatures, generic 
 
 ## How RoomQL compares to the alternatives
 
-| Approach | Column names checked? | Runtime-optional filters | Cost |
-|---|---|---|---|
-| **RoomQL** | Yes, via generated refs | Native — `null` drops the condition | Three artifacts, a `.toQuery()` call, no whole-query SQL validation |
-| Room `@Query` string | No | `(:x IS NULL OR col = :x)` per filter | Room validates the whole SQL at compile time — a real advantage RoomQL gives up |
-| Overloaded DAO methods | Via Room's `@Query` checking | One method per combination (2ⁿ) | Unmaintainable past a few filters |
-| Hand-built `SimpleSQLiteQuery` | No — you concatenate strings | Manual `if` ladders | Zero dependencies; every injection and arg-ordering bug is yours |
-| `SupportSQLiteQueryBuilder` (androidx.sqlite) | No — columns are strings | Manual | Already on your classpath; no type safety, no Room integration |
-| [SQLDelight](https://github.com/sqldelight/sqldelight) | Yes — full SQL verified at compile time | Limited; dynamic shapes need generated variants or raw execution | You leave Room entirely and own the schema in `.sq` files |
+| Approach | Whole-query SQL checked? | Dynamic sort/group column | Dynamic `SELECT` list | Optional filter values | Cost |
+|---|---|---|---|---|---|
+| **RoomQL** | No — `@RawQuery` skips it | Yes — a real `Column<T>`, checked at compile time | Yes — `select(...)`, same typed references | Native — `null` drops the condition | Two dependency lines, a `.toQuery()` call, no whole-query SQL validation |
+| Room `@Query` string | Yes, at compile time | Via a `CASE WHEN :sortBy = ... THEN col` ladder, bound to a string — works, unreadable past one axis | No static way to vary the column list at all | `(:x IS NULL OR col = :x)` per filter — works fine | None; this is Room's default, best-checked path when your query is otherwise static |
+| Overloaded DAO methods | Yes, each method's SQL is checked | One static method per column/direction — fine for a small, fixed set | One method per projection shape you need | One method per filter combination (2ⁿ) | Grows combinatorially once more than one axis varies at once |
+| Hand-built `SimpleSQLiteQuery` | No — you concatenate strings | Yes, nothing checked at compile time | Yes, nothing checked at compile time | Manual `if` ladders | Zero dependencies; every injection, column-typo, and arg-ordering bug is yours |
+| `SupportSQLiteQueryBuilder` (androidx.sqlite) | No — columns are strings | Yes, nothing checked at compile time | Yes, nothing checked at compile time | Manual | Already on your classpath; no type safety, no Room integration |
+| [SQLDelight](https://github.com/sqldelight/sqldelight) | Yes — full SQL verified at compile time | Same `CASE` trick as `@Query`, same limits | No static way to vary the column list at all | Limited; dynamic shapes need generated variants or raw execution | You leave Room entirely and own the schema in `.sq` files |
 
-**Use RoomQL when** you are staying on Room and have search-style queries whose filters are decided at runtime. **Do not use RoomQL when** your queries are static — a plain `@Query` gives you full compile-time SQL verification, which RoomQL cannot, because `@RawQuery` skips it by design. It is also the wrong tool if you need a query shape RoomQL does not build: column projections, `DISTINCT`, aggregate expressions, multi-column `GROUP BY`, subqueries, or `UNION`. RoomQL selects whole rows.
+A single dynamic axis in isolation usually has a workaround that does not need RoomQL: a `when (sortField) { ... }` dispatch for one of a handful of sort columns, or a `CASE`-based `ORDER BY`/`GROUP BY` bound to a plain string. The two places static SQL has no workaround at all are a dynamic `SELECT` list (no bound value can shrink or grow it) and toggling an `INNER JOIN` (an always-false `ON` drops every row rather than neutralizing it — `LEFT JOIN` can be gated this way, `INNER JOIN` cannot). **Use RoomQL when** more than one of these axes needs to vary together, or when you want one consistent typed vocabulary instead of a `CASE` ladder for structure and an `IS NULL OR` ladder for values. **Do not use RoomQL** for queries that are fully static, for a single small-cardinality axis a `when` dispatch already covers, or if you need a shape it does not build at all: `DISTINCT`, subqueries, or `UNION`.
 
 ## FAQ
 
 ### Does RoomQL replace Room?
 
-No. RoomQL sits on top of Room and produces the `SupportSQLiteQuery` that Room's own `@RawQuery` methods take. You keep your `@Entity` classes, your `@Database`, your DAOs, and your migrations exactly as they are — RoomQL only replaces the SQL string for queries whose filters vary at runtime.
+No. RoomQL sits on top of Room and produces the `SupportSQLiteQuery` that Room's own `@RawQuery` methods take. You keep your `@Entity` classes, your `@Database`, your DAOs, and your migrations exactly as they are — RoomQL only replaces the SQL string for queries whose filter values or structure (sort, group, join, projection) vary at runtime.
+
+### Why not just use the `(:x IS NULL OR col = :x)` trick on a plain `@Query`?
+
+For optional *filter values* on an otherwise fixed query shape, that trick is genuinely fine — one `@Query`, one method, and Room checks the whole SQL string at compile time, which RoomQL cannot match. Stay on it if that is all you need. RoomQL earns its cost once the query's *structure* also needs to vary — and it is worth being precise about which parts of "structure" actually force the issue. A single dynamic sort or group-by column has a static workaround too: a `CASE WHEN :sortBy = 'age' THEN age ... END` bound to a plain string, the same value-binding trick as `IS NULL OR`. It just gets unreadable fast, and stops composing cleanly the moment a second axis — an optional join, a filter — needs to vary alongside it. The one thing with no static workaround at all is a dynamic `SELECT` list: no bound value can add or remove a column from it. If you only ever need one axis of structural dynamism, a `when (sortField) { ... }` dispatch may be all you need; reach for RoomQL once several axes need to compose, or once you need `select(...)`.
 
 ### How do I build a Room query with optional filters in Kotlin?
 
@@ -229,8 +260,9 @@ Know these before adopting:
 - **Positional `?` args only.** No named parameters — a Room `@RawQuery` restriction.
 - **`QueryBuilder` is not thread-safe.** Build a query on one thread or coroutine; never share a half-built builder.
 - **Validation is deferred to `build()`.** Missing `from()`, a non-positive `limit`, `offset` without `limit`, and `having` without `groupBy` all throw `RoomQlException` at build time, not while you configure.
-- **Whole-row selects only.** No projections, `DISTINCT`, aggregate expressions, multi-column `GROUP BY`, subqueries, or `UNION`.
-- **Room version range.** Targets Room 2.6.x (API 21+), the version pinned and tested in CI. Room 2.8 raised `minSdk` to 23; support is deferred.
+- **No `DISTINCT`, subqueries, or `UNION`.** `select(...)` covers explicit projections and aggregates; these three remain out of scope.
+- **`@Projection`-generated factories only cover the constructor-property shape.** A result class outside that shape (a computed property, a shape KSP can't infer) still names its columns with the plain `alias` infix instead.
+- **Room version range.** Targets Room 2.6.x–2.7.x (API 21+): CI tests 2.6.1, and `scripts/verify-toolchains.sh` tests 2.7.2 before each release. Room 2.8 raised `minSdk` to 23; support is deferred.
 - **No auto-generated JOIN result types.** You supply your own result class — by design, so you control its shape.
 
 ## Modules
@@ -241,7 +273,7 @@ Know these before adopting:
 | [`:runtime-android`](runtime-android) | `io.github.kotplat.roomql:runtime-android` | `RoomQlQuery.toQuery()` → `SupportSQLiteQuery` |
 | [`:ksp-processor`](ksp-processor) | `io.github.kotplat.roomql:ksp-processor` | generates the `*Table` objects from `@Entity` |
 
-> **On annotation-driven integration.** RoomQL uses Room's manual `@RawQuery`: you declare the method, build with `query { }`, and pass `.toQuery()`. A zero-boilerplate annotation-driven integration was explored and dropped — KSP cannot read function bodies, so it could not infer the query or `observedEntities`. That exploration lives on the `development` branch and is tracked in issues [#6](https://github.com/KotPlat/RoomQL/issues/6) and [#13](https://github.com/KotPlat/RoomQL/issues/13). No release ships an annotation artifact yet.
+> **On annotation-driven integration.** RoomQL uses Room's manual `@RawQuery`: you declare the method, build with `query { }`, and pass `.toQuery()`. A zero-boilerplate annotation-driven integration was explored and dropped — KSP cannot read function bodies, so it could not infer the query or `observedEntities`. That exploration lives on the `development` branch; the rationale and the compiler-plugin alternative that was considered are documented in the closed issues [#6](https://github.com/KotPlat/RoomQL/issues/6) and [#13](https://github.com/KotPlat/RoomQL/issues/13). No release ships an annotation artifact yet.
 
 ## Contributing and support
 

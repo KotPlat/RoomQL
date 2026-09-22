@@ -15,6 +15,7 @@ The public surface is deliberately small and is frozen by [Binary Compatibility 
   - [JoinScope and JoinConditionScope](#joinscope-and-joinconditionscope)
   - [Column](#column)
   - [Aggregate functions](#aggregate-functions)
+  - [Projections](#projections)
   - [EntityTable](#entitytable)
   - [RoomQlQuery](#roomqlquery)
   - [JoinType and SortDirection](#jointype-and-sortdirection)
@@ -56,6 +57,7 @@ The receiver inside `query { }`. Marked `@RoomQlDsl`, so outer-scope members can
 | `where` | `where(block: WhereScope.() -> Unit)` | Opens a `WhereScope`. Repeated calls merge into one AND-combined set. |
 | `groupBy` | `groupBy(column: Column<*>)` | Adds a column to `GROUP BY`. Call repeatedly for a multi-column `GROUP BY`. |
 | `having` | `having(block: HavingScope.() -> Unit)` | Opens a `HavingScope` for `HAVING`. Requires `groupBy`. |
+| `select` | `select(vararg items: SelectItem<*>)` | Projects specific columns/aggregates instead of whole rows. See [Projections](#projections). |
 | `orderBy` | `orderBy(expression: Expression<*>, direction: SortDirection)` | Appends a sort key. Call repeatedly for a multi-column `ORDER BY`. |
 | `limit` | `limit(n: Int)` | Sets `LIMIT`. Must be positive. |
 | `offset` | `offset(n: Int)` | Sets `OFFSET`. Requires `limit`. |
@@ -166,6 +168,94 @@ query {
 
 `count` and `countAll` are deliberately separate: under a `LEFT JOIN`, `COUNT(column)` yields 0 for an unmatched row, while `COUNT(*)` yields 1. `sum` and `avg` are constrained to numeric column types; `avg` always returns `Double?` regardless of the input numeric type, matching SQL's own `AVG`. All six aggregate results are nullable, since SQL returns `NULL` for an empty group.
 
+### Projections
+
+```kotlin
+// QueryBuilder member — see QueryBuilder above
+public fun select(vararg items: SelectItem<*>)
+public infix fun <T> Expression<T>.alias(name: String): SelectItem<T>
+```
+
+`SelectItem` is covariant (`out T`), so an `Array<SelectItem<Long?>>` accepts a `SelectItem<Long>`.
+
+Every `Expression` is a `SelectItem`, so a column or aggregate passes straight in. `alias` returns a `SelectItem` that is *not* an `Expression`, so an aliased value is a compile error anywhere but `select(...)` — in `orderBy`, `having { }`, or inside an aggregate.
+
+`select(...)` projects specific columns and aggregates instead of whole rows. Left out entirely, `build()` behaves exactly as v1: `SELECT *`, with `JOIN`-collision columns aliased automatically. Present, that automatic aliasing switches off — `select(...)`'s argument list is the complete, explicit set of columns returned:
+
+```kotlin
+val q = query {
+    from(ProductTable)
+    where { ProductTable.category eq "electronics" }
+    select(countAll())
+}
+// SELECT COUNT(*) FROM products WHERE category = ?
+```
+
+A single unaliased expression needs no name — Room binds it straight to a scalar return type (`Int`, `Long`, …), exactly like any other query. `alias` names an expression's output column, for a multi-column projection:
+
+```kotlin
+select(
+    CategoryTable.id alias "category_id",
+    count(ProductTable.id) alias "product_count",
+)
+// SELECT id AS `category_id`, COUNT(id) AS `product_count` FROM ...
+```
+
+The alias is backtick-quoted, so a reserved word (`order`, `group`) works as a name; SQLite reports the column unquoted, so Room still maps it by the plain name.
+
+**Validated at `build()`**, via the same `roomQlCheck` mechanism as every other check on this page — not a type-state DSL:
+
+- A **grouped** query (`groupBy(...)` set) whose projection has a bare column absent from `GROUP BY` throws — SQLite would otherwise pick an arbitrary row's value for it.
+- An **ungrouped** query mixing an aggregate with a bare column throws for the same reason, without an explicit `GROUP BY` to name.
+- Two items with the same output name (an alias, a bare column's name, or an unaliased aggregate's SQL text such as `COUNT(*)`) throw — Room would bind only one of them. This includes the same column name from two joined tables, such as `select(UserTable.id, OrderTable.id)`: alias all but one.
+- An alias containing a backtick throws, since it cannot be quoted.
+- An ungrouped, aggregate-free multi-column projection (`select(a, b)`) passes through uncaught — an ordinary `SELECT a, b`, nothing unsafe about it.
+
+#### @Projection: a generated factory instead of hand-written `alias` calls
+
+```kotlin
+public annotation class Projection
+```
+
+Annotate a result data class whose primary constructor describes a multi-column projection, and the KSP processor generates `<ClassName>Projection(...)` in the same package: one `Expression<T>` parameter per constructor property, in declaration order, returning `Array<SelectItem<*>>` ready to spread into `select(...)`. A property's `@ColumnInfo(name = ...)` becomes that parameter's alias; without one, the alias falls back to the property's own name — the same rule the `*Table` generator uses for column names.
+
+Each generated parameter is a plain `Expression<T>` — nothing about the generator is specific to `count`. A `Column<T>` and any of the six aggregate functions (`count`, `countAll`, `sum`, `avg`, `min`, `max`) all satisfy it interchangeably, so a projection can mix them freely per field:
+
+```kotlin
+@Projection
+data class CategorySummary(
+    @ColumnInfo(name = "category_id") val categoryId: Int,
+    @ColumnInfo(name = "category_name") val categoryName: String,
+    val productCount: Long,
+    @ColumnInfo(name = "avg_price") val avgPrice: Double?,
+)
+```
+
+The processor generates `CategorySummaryProjection(...)` in the same package, returning `Array<SelectItem<*>>`. You call it; you never write it. Its parameters, in order:
+
+| Parameter | Type | Aliased as |
+|---|---|---|
+| `categoryId` | `Expression<Int>` | `category_id` |
+| `categoryName` | `Expression<String>` | `category_name` |
+| `productCount` | `Expression<Long>` | `productCount` (no `@ColumnInfo`, so the property name) |
+| `avgPrice` | `Expression<Double?>` | `avg_price` |
+
+```kotlin
+select(
+    *CategorySummaryProjection(
+        CategoryTable.id,          // a bare Column<Int>
+        CategoryTable.name,        // a bare Column<String>
+        count(ProductTable.id),    // an aggregate — could just as well be sum, min, or max
+        avg(ProductTable.price),
+    )
+)
+// SELECT id AS `category_id`, name AS `category_name`, COUNT(id) AS `productCount`, AVG(price) AS `avg_price` FROM ...
+```
+
+A missing or mismatched-type argument to the generated function is then an ordinary Kotlin compile error at the call site — the same mechanism as forgetting a constructor argument — rather than a runtime `RoomQlException`. The generated function takes the annotated class's visibility, so an `internal` class gets an `internal` factory. `@Projection` has `SOURCE` retention: nothing about it survives into the compiled class, consistent with RoomQL's no-reflection guarantee. It only covers the constructor-property shape; for anything else, fall back to the plain `alias` infix.
+
+The factory returns plain `Array<SelectItem<*>>`, not a `Projection<CategorySummary>`. Room binds rows to your DAO method's declared return type, and `@RawQuery` never checks that type against the query, so a type parameter on the projection would have nothing to enforce it. What `@Projection` does guarantee is that every property gets an argument of the right type, under the right alias.
+
 ### EntityTable
 
 ```kotlin
@@ -209,6 +299,10 @@ Thrown by `build()` — and therefore by `query { }` — when the configured que
 | `offset()` without `limit()` | `offset() requires limit() to be set` |
 | `having { }` without `groupBy()` | `having() requires groupBy() to be set` |
 | `join()` after a raw-string `from(String)` | `join() requires from(EntityTable) so columns can be aliased; from(String) has no column metadata` |
+| `select(...)` grouped bare column missing from `groupBy()` | `select(...) column(s) not in groupBy(): <names>` |
+| `select(...)` mixing an aggregate with a bare column, ungrouped | `select(...) cannot mix an aggregate with a bare column unless groupBy() is set` |
+| `alias()` name containing a backtick | `alias() names cannot contain a backtick: <names>` |
+| `select(...)` items sharing an output name | `select(...) returns more than one column named: <names>; alias all but one` |
 
 ---
 
@@ -253,10 +347,11 @@ ksp {
 | Annotation | Effect |
 |---|---|
 | `@Entity(tableName = "...")` | Sets the generated `tableName`. Without it, the class name is used. |
-| `@ColumnInfo(name = "...")` | Sets the column's SQL name. The Kotlin property keeps its own name. |
+| `@ColumnInfo(name = "...")` | Sets the column's SQL name, or a `@Projection` parameter's alias. The Kotlin property keeps its own name. |
 | `@Ignore` | The property is skipped — it is not a column. |
+| `@Projection` (`com.roomql.runtime`) | Generates `<ClassName>Projection(...)` instead of a `*Table` object — see [`@Projection`](#projection-a-generated-factory-instead-of-hand-written-alias-calls). |
 
-Nullable properties produce a nullable `Column<T?>`.
+Nullable properties produce a nullable `Column<T?>` (or `Expression<T?>` parameter, for `@Projection`).
 
 ---
 
@@ -273,16 +368,14 @@ data class UserEntity(
 )
 ```
 
-the processor generates, in the **same package**:
+the processor generates `object UserEntityTable : EntityTable` in the **same package**. It is generated on every build, so never write or edit it by hand. Its members:
 
-```kotlin
-object UserEntityTable : EntityTable {
-    override val tableName = "users"
-    override val allColumnNames = listOf("id", "name", "created_at")
-    val id: Column<Int> = Column("id", "users")
-    val name: Column<String> = Column("name", "users")
-    val createdAt: Column<Long> = Column("created_at", "users")
-}
-```
+| Member | Type | Value |
+|---|---|---|
+| `tableName` | `String` | `"users"` |
+| `allColumnNames` | `List<String>` | `["id", "name", "created_at"]` |
+| `id` | `Column<Int>` | SQL column `id` |
+| `name` | `Column<String>` | SQL column `name` |
+| `createdAt` | `Column<Long>` | SQL column `created_at` |
 
 Because each column is a real Kotlin symbol, renaming or deleting a property breaks every query that referenced it at **compile** time. Note that RoomQL checks column *references* only — Room's `@RawQuery` skips Room's static SQL verification, so query logic is still verified at runtime. See the [comparison in the README](../README.md#how-roomql-compares-to-the-alternatives).

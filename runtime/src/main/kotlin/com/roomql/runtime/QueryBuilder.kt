@@ -1,5 +1,6 @@
 package com.roomql.runtime
 
+/** The receiver inside [query]: accumulates the query's clauses, then renders them on [build]. Not thread-safe. */
 @RoomQlDsl
 public class QueryBuilder {
     private var fromTable: String? = null
@@ -11,47 +12,63 @@ public class QueryBuilder {
     private var offsetValue: Int? = null
     private val groupByColumns = mutableListOf<Column<*>>()
     private var havingScope: HavingScope? = null
+    private val selectItems = mutableListOf<SelectItem<*>>()
 
+    /** Sets the primary table by raw name; carries no column metadata, so [build] rejects a [join] after it. Trusted names only. */
     public fun from(tableName: String) {
         fromTable = tableName
     }
 
+    /** Sets the primary table from a generated `*Table`; required for [join], which needs its column names to alias collisions. */
     public fun from(table: EntityTable) {
         fromEntityTable = table
         fromTable = table.tableName
     }
 
+    /** Adds a `JOIN` of [type] against [table], with its `ON` predicate in [block]. Requires [from] with a `*Table`. */
     public fun join(table: EntityTable, type: JoinType, block: JoinScope.() -> Unit) {
         val scope = JoinScope().apply(block)
         joins.add(JoinClause(table, type, scope.onCondition))
     }
 
+    /** Opens a [WhereScope]; repeated calls add to one AND-combined set rather than replacing it. */
     public fun where(block: WhereScope.() -> Unit) {
         val scope = whereScope ?: WhereScope().also { whereScope = it }
         scope.apply(block)
     }
 
+    /** Appends a sort key on a [Column] or aggregate; repeated calls render in call order. */
     public fun orderBy(expression: Expression<*>, direction: SortDirection) {
         orderByClauses.add(expression to direction)
     }
 
+    /** Sets `LIMIT`. Repeated calls overwrite the previous value. [build] throws unless [n] is positive. */
     public fun limit(n: Int) {
         limitValue = n
     }
 
+    /** Sets `OFFSET`, overwriting any previous value. [build] throws unless [limit] is also set (a SQLite rule). */
     public fun offset(n: Int) {
         offsetValue = n
     }
 
+    /** Adds a [Column] to `GROUP BY`; repeated calls render in call order. Aggregates are not accepted. */
     public fun groupBy(column: Column<*>) {
         groupByColumns.add(column)
     }
 
+    /** Opens a [HavingScope], merging like [where]. [build] throws unless [groupBy] is set. */
     public fun having(block: HavingScope.() -> Unit) {
         val scope = havingScope ?: HavingScope().also { havingScope = it }
         scope.apply(block)
     }
 
+    /** Projects [items] instead of whole rows, switching off `JOIN`-collision aliasing; repeated calls accumulate. */
+    public fun select(vararg items: SelectItem<*>) {
+        selectItems.addAll(items)
+    }
+
+    /** Validates and renders this builder into a [RoomQlQuery], throwing [RoomQlException] if invalid. Safe to call repeatedly. */
     public fun build(): RoomQlQuery {
         val table = fromTable ?: throw RoomQlException("from() must be called before build()")
         val limit = limitValue
@@ -63,11 +80,15 @@ public class QueryBuilder {
         roomQlCheck(joins.isEmpty() || entityTable != null) {
             "join() requires from(EntityTable) so columns can be aliased; from(String) has no column metadata"
         }
-
         val collidingNames = collidingColumnNames()
+        checkSelectProjection(collidingNames)
+
         val args = mutableListOf<Any?>()
         val sql = buildString {
-            if (joins.isNotEmpty() && entityTable != null) {
+            if (selectItems.isNotEmpty()) {
+                append("SELECT ")
+                append(selectItems.joinToString(", ") { it.renderSelectItem(collidingNames) })
+            } else if (joins.isNotEmpty() && entityTable != null) {
                 appendSelectWithAliasing(entityTable, joins, collidingNames)
             } else {
                 append("SELECT *")
@@ -110,6 +131,29 @@ public class QueryBuilder {
         return RoomQlQuery(sql, args)
     }
 
+    /** Rejects a select(...) that would let Room or SQLite map the wrong value silently. */
+    private fun checkSelectProjection(collidingNames: Set<String>) {
+        if (selectItems.isEmpty()) return
+        val expressions = selectItems.map { it.parts().first }
+        val bareColumns = expressions.filterIsInstance<Column<*>>()
+        val hasAggregate = expressions.any { it is AggregateExpression<*> }
+        if (groupByColumns.isNotEmpty()) {
+            val ungrouped = bareColumns.filter { it !in groupByColumns }
+            roomQlCheck(ungrouped.isEmpty()) {
+                "select(...) column(s) not in groupBy(): ${ungrouped.joinToString { it.columnName }}"
+            }
+        } else {
+            roomQlCheck(!(hasAggregate && bareColumns.isNotEmpty())) {
+                "select(...) cannot mix an aggregate with a bare column unless groupBy() is set"
+            }
+        }
+
+        val badAliases = selectItems.filterIsInstance<AliasedExpression<*>>().map { it.alias }.filter { '`' in it }
+        roomQlCheck(badAliases.isEmpty()) { "alias() names cannot contain a backtick: ${badAliases.joinToString()}" }
+        val duplicates = selectItems.map { it.outputName(collidingNames) }.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
+        roomQlCheck(duplicates.isEmpty()) { "select(...) returns more than one column named: ${duplicates.joinToString()}; alias all but one" }
+    }
+
     /** Column names shared by more than one table in this query's FROM + JOINs. Empty when there are no joins. */
     private fun collidingColumnNames(): Set<String> {
         val primary = fromEntityTable ?: return emptySet()
@@ -130,6 +174,25 @@ private const val SQL_OR = " OR "
 private fun Expression<*>.render(collidingNames: Set<String>): String = when (this) {
     is Column<*> -> if (columnName in collidingNames) "$tableName.$columnName" else columnName
     is AggregateExpression<*> -> "$sqlFunction(${operand?.render(collidingNames) ?: "*"})"
+}
+
+/** Splits an item into its expression and its alias, or null when unaliased. */
+private fun SelectItem<*>.parts(): Pair<Expression<*>, String?> = when (this) {
+    is Expression<*> -> this to null
+    is AliasedExpression<*> -> expression to alias
+}
+
+// Quoted so a reserved word (`order`, `group`) still works as an alias; SQLite reports the name unquoted.
+private fun SelectItem<*>.renderSelectItem(collidingNames: Set<String>): String {
+    val (expression, alias) = parts()
+    val rendered = expression.render(collidingNames)
+    return if (alias == null) rendered else "$rendered AS `$alias`"
+}
+
+/** The column name Room sees: the alias, a bare column's name, or an unaliased aggregate's own SQL text. */
+private fun SelectItem<*>.outputName(collidingNames: Set<String>): String {
+    val (expression, alias) = parts()
+    return alias ?: if (expression is Column<*>) expression.columnName else expression.render(collidingNames)
 }
 
 private fun renderCondition(condition: Condition, args: MutableList<Any?>, sb: StringBuilder, collidingNames: Set<String>) {
@@ -162,6 +225,11 @@ private fun StringBuilder.appendConditions(
         renderCondition(c, args, this, collidingNames)
     }
 
+/**
+ * RoomQL's entry point. Applies [block] to a fresh [QueryBuilder], calls
+ * [QueryBuilder.build], and returns the finished [RoomQlQuery]. Throws [RoomQlException] if
+ * the configured query is invalid.
+ */
 public fun query(block: QueryBuilder.() -> Unit): RoomQlQuery = QueryBuilder().apply(block).build()
 
 private fun StringBuilder.appendSelectWithAliasing(primary: EntityTable, joins: List<JoinClause>, collidingNames: Set<String>) {

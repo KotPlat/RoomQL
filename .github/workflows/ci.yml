@@ -11,7 +11,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Full history so the release-tag lookup below sees tags; the default shallow checkout has none.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
@@ -37,19 +40,36 @@ jobs:
       - name: Check public API surface
         run: ./gradlew apiCheck
 
+      # Latest release tag rather than a hardcoded version, so a version bump needs no edit here.
+      - name: Resolve a version to publish and verify against
+        id: version
+        run: |
+          VERSION="$(./scripts/latest-release-version.sh)"
+          if [ -z "$VERSION" ]; then
+            echo "::error::No X.Y.Z release tag found in history" >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Using version $VERSION for this run's local publish/verify/demo cycle"
+
       # The demo is a standalone Gradle build consuming RoomQL as published artifacts.
       # Publishing locally first means CI verifies the documented install path, not just
       # that the code compiles.
-      # Published under the exact version demo/gradle/libs.versions.toml asks for, so
-      # mavenLocal() satisfies it. Keep the two in step if the demo's roomql version moves.
       - name: Publish library to Maven local
-        run: VERSION=2.0.0 ./gradlew publishToMavenLocal
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: ./gradlew publishToMavenLocal
 
       # RoomQL promises consumers they need no keep rules. That holds only while the
       # published artifacts stay free of reflection and name derivation, so it is checked
       # against the real jar and aar rather than asserted in the README.
       - name: Verify no reflection in published artifacts
-        run: ./scripts/verify-no-reflection.sh 2.0.0
+        run: ./scripts/verify-no-reflection.sh "${{ steps.version.outputs.version }}"
+
+      # The demo's pinned `roomql` version keeps a plain checkout working; CI swaps in the version just published.
+      - name: Point the demo at the version just published
+        run: |
+          sed -i "s/^roomql = .*/roomql = \"${{ steps.version.outputs.version }}\"/" demo/gradle/libs.versions.toml
 
       - name: Build demo app
         run: ./gradlew -p demo assembleDebug

@@ -33,6 +33,10 @@ interface ProductDao {
     /** JOIN results, mapped into the caller-supplied [ProductWithBrand]. */
     @RawQuery
     fun searchWithBrand(query: SupportSQLiteQuery): List<ProductWithBrand>
+
+    /** Grouped, aggregated rows, mapped into the caller-supplied [BrandSummary]. */
+    @RawQuery
+    fun brandSummary(query: SupportSQLiteQuery): List<BrandSummary>
 }
 
 @Dao

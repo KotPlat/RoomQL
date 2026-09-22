@@ -4,27 +4,33 @@ All notable changes to **RoomQL** are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and RoomQL follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.0] - 2026-09-23
 
 ### Added
 
 - **Aggregate functions**: `count`, `countAll`, `sum`, `avg`, `min`, `max` as `Expression<T>`
   factories, usable in `having { }` and `orderBy`. `count`/`countAll` are kept separate because
   they differ under a `LEFT JOIN`; `sum`/`avg` are constrained to numeric columns. See #72.
-- **`groupBy()` is additive**: repeated calls now append instead of overwriting, so
-  `GROUP BY a, b` is expressible as `groupBy(a); groupBy(b)`, matching `orderBy`'s existing
-  precedent. See #75.
-
-### Changed — breaking
-
-- **`Expression<T>` becomes the root type behind `having { }` and `orderBy`**, with `Column<T>`
-  implementing it. `where { }`'s operators and `groupBy()` deliberately stay `Column<T>`-only —
-  SQL forbids aggregates in both positions. See #71.
-
-## [2.0.0] - 2026-09-19
-
-### Added
-
+- **`select(vararg items: SelectItem<*>)`**: projects specific columns and aggregates
+  instead of whole rows, switching off v1's automatic JOIN-collision aliasing when present. A
+  single unaliased expression needs no name — Room binds it straight to a scalar return type.
+  The `alias` infix names a column for the multi-column case; it renders backtick-quoted and
+  returns a `SelectItem` rather than an `Expression`, so an aliased value only compiles inside
+  `select(...)`. `build()` rejects a grouped projection with a bare column missing from
+  `groupBy()`, an ungrouped projection mixing an aggregate with a bare column, and two items
+  sharing one output name (an unaliased aggregate's name is its SQL text, e.g. `COUNT(*)`).
+  `select` takes a vararg rather than the `select { }` block first sketched in #73: its items are
+  plain values, so a block would add a scope with nothing to put in it. See #73.
+- **`@Projection`-generated factory functions for multi-column `select(...)`**: annotate a
+  result data class with `@Projection` and the KSP processor generates `<ClassName>Projection(...)`
+  — one `Expression<T>` parameter per constructor property, honouring `@ColumnInfo(name = ...)`
+  for the alias and the annotated class's visibility — so a missing or mismatched-type argument
+  is an ordinary Kotlin compile error at the call site, the same as forgetting a constructor argument. The `alias` infix remains the
+  escape hatch for shapes `@Projection` can't model. The factory returns `Array<SelectItem<*>>`,
+  not the typed `Projection<R>` carrier #73/#74 first proposed: Room binds rows to the DAO
+  method's declared return type, which `@RawQuery` never checks against the query, so a `R` on
+  the projection would not be enforced anywhere. The annotation ships as `@Projection` rather
+  than `@RoomQlProjection`, matching the package-qualified name `com.roomql.runtime.Projection`. See #74.
 - **Maven Central publishing.** All three artifacts publish under a new groupId,
   `io.github.kotplat.roomql`, with `roomql-` prefixes dropped from the artifactIds
   (`roomql-runtime` → `runtime`, `roomql-runtime-android` → `runtime-android`,
@@ -36,6 +42,13 @@ All notable changes to **RoomQL** are documented here. The format follows
   manual review — publishing itself stays a deliberate human step. See #66.
 
 ### Changed — breaking
+
+- **`groupBy()` is additive**: repeated calls now append instead of overwriting, so
+  `groupBy(a); groupBy(b)` renders `GROUP BY a, b` where 1.x kept only `b`. Code that called it
+  twice expecting the last call to win now groups by both columns. See #75.
+- **`Expression<T>` becomes the root type behind `having { }` and `orderBy`**, with `Column<T>`
+  implementing it. `where { }`'s operators and `groupBy()` deliberately stay `Column<T>`-only —
+  SQL forbids aggregates in both positions. See #71.
 
 - **Every value-taking condition operator splits into a required and an optional form.**
   `eq`, `gte`, `like`, `inList`, `between`, and the rest now take `T & Any` and will not
@@ -126,7 +139,8 @@ without `limit()`, a `having()` without `groupBy()`, and a `join()` on a raw-str
 
 Annotation-driven DAO generation. KSP cannot read function bodies, so the query and its
 `observedEntities` cannot be inferred from an annotated method. The exploration lives on the
-`development` branch and is tracked for v2 in
+`development` branch; the rationale and the compiler-plugin alternative that was considered
+and deferred are documented in the closed issues
 [#6](https://github.com/KotPlat/RoomQL/issues/6) and
 [#13](https://github.com/KotPlat/RoomQL/issues/13).
 

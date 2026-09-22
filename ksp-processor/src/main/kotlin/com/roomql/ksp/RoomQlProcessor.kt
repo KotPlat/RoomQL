@@ -1,5 +1,6 @@
 package com.roomql.ksp
 
+import com.google.devtools.ksp.getVisibility
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
@@ -8,12 +9,20 @@ import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSAnnotation
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
+import com.google.devtools.ksp.symbol.KSValueParameter
+import com.google.devtools.ksp.symbol.Visibility
 import com.google.devtools.ksp.validate
+import com.squareup.kotlinpoet.ARRAY
 import com.squareup.kotlinpoet.ClassName
+import com.squareup.kotlinpoet.CodeBlock
 import com.squareup.kotlinpoet.FileSpec
+import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.KModifier
+import com.squareup.kotlinpoet.MemberName
+import com.squareup.kotlinpoet.ParameterSpec
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.PropertySpec
+import com.squareup.kotlinpoet.STAR
 import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.asClassName
 import com.squareup.kotlinpoet.ksp.addOriginatingKSFile
@@ -23,10 +32,14 @@ import com.squareup.kotlinpoet.ksp.writeTo
 private const val ENTITY_ANNOTATION = "androidx.room.Entity"
 private const val COLUMN_INFO_ANNOTATION = "androidx.room.ColumnInfo"
 private const val IGNORE_ANNOTATION = "androidx.room.Ignore"
+private const val PROJECTION_ANNOTATION = "com.roomql.runtime.Projection"
 private const val TABLE_SUFFIX_OPTION = "roomql.tableSuffix"
 private const val DEFAULT_TABLE_SUFFIX = "Table"
 private val COLUMN_CLASS = ClassName("com.roomql.runtime", "Column")
 private val ENTITY_TABLE_CLASS = ClassName("com.roomql.runtime", "EntityTable")
+private val EXPRESSION_CLASS = ClassName("com.roomql.runtime", "Expression")
+private val SELECT_ITEM_CLASS = ClassName("com.roomql.runtime", "SelectItem")
+private val ALIAS_MEMBER = MemberName("com.roomql.runtime", "alias")
 
 internal class RoomQlProcessor(private val environment: SymbolProcessorEnvironment) : SymbolProcessor {
     private val tableSuffix = environment.options[TABLE_SUFFIX_OPTION] ?: DEFAULT_TABLE_SUFFIX
@@ -37,6 +50,12 @@ internal class RoomQlProcessor(private val environment: SymbolProcessorEnvironme
             .filterIsInstance<KSClassDeclaration>()
             .forEach { classDecl ->
                 if (classDecl.validate()) generateTableObject(classDecl)
+                else deferred.add(classDecl)
+            }
+        resolver.getSymbolsWithAnnotation(PROJECTION_ANNOTATION)
+            .filterIsInstance<KSClassDeclaration>()
+            .forEach { classDecl ->
+                if (classDecl.validate()) generateProjectionFactory(classDecl)
                 else deferred.add(classDecl)
             }
         return deferred
@@ -81,14 +100,75 @@ internal class RoomQlProcessor(private val environment: SymbolProcessorEnvironme
             .writeTo(environment.codeGenerator, aggregating = false)
     }
 
+    /** Generates `<ClassName>Projection(...)`: one `Expression<T>` per constructor property, returned aliased. */
+    private fun generateProjectionFactory(classDecl: KSClassDeclaration) {
+        val packageName = classDecl.packageName.asString()
+        val className = classDecl.simpleName.asString()
+        val functionName = "${className}Projection"
+
+        val params = classDecl.primaryConstructor?.parameters.orEmpty()
+        if (params.isEmpty()) {
+            environment.logger.error(
+                "RoomQL: @Projection class '$className' has no primary constructor properties to project",
+                classDecl,
+            )
+            return
+        }
+
+        // @ColumnInfo can't target a constructor parameter, so Kotlin puts it on the backing property.
+        val propertiesByName = classDecl.getAllProperties().associateBy { it.simpleName.asString() }
+        val fields = params.map { param ->
+            val property = propertiesByName[param.name?.asString()]
+            val columnName = if (property != null) extractColumnName(property) else extractColumnName(param)
+            param to columnName
+        }
+        val returnType = ARRAY.parameterizedBy(SELECT_ITEM_CLASS.parameterizedBy(STAR))
+
+        val body = CodeBlock.builder().apply {
+            add("return arrayOf(\n")
+            indent()
+            fields.forEachIndexed { i, (param, columnName) ->
+                add("%N %M %S", param.name!!.asString(), ALIAS_MEMBER, columnName)
+                add(if (i < fields.lastIndex) ",\n" else "\n")
+            }
+            unindent()
+            add(")\n")
+        }.build()
+
+        val funSpec = FunSpec.builder(functionName)
+            .apply {
+                if (classDecl.getVisibility() == Visibility.INTERNAL) addModifiers(KModifier.INTERNAL)
+                classDecl.containingFile?.let { addOriginatingKSFile(it) }
+                fields.forEach { (param, _) ->
+                    val paramName = param.name!!.asString()
+                    val paramType = EXPRESSION_CLASS.parameterizedBy(param.type.resolve().toTypeName())
+                    addParameter(ParameterSpec.builder(paramName, paramType).build())
+                }
+            }
+            .returns(returnType)
+            .addCode(body)
+            .build()
+
+        FileSpec.builder(packageName, functionName)
+            .addFunction(funSpec)
+            .build()
+            .writeTo(environment.codeGenerator, aggregating = false)
+    }
+
     private fun extractTableName(classDecl: KSClassDeclaration): String {
         val explicit = findAnnotationArg(classDecl.annotations, ENTITY_ANNOTATION, "tableName")
         return if (explicit.isNullOrEmpty()) classDecl.simpleName.asString() else explicit
     }
 
-    private fun extractColumnName(prop: KSPropertyDeclaration): String {
-        val explicit = findAnnotationArg(prop.annotations, COLUMN_INFO_ANNOTATION, "name")
-        return if (explicit.isNullOrEmpty()) prop.simpleName.asString() else explicit
+    private fun extractColumnName(prop: KSPropertyDeclaration): String =
+        columnNameOrDefault(prop.annotations, prop.simpleName.asString())
+
+    private fun extractColumnName(param: KSValueParameter): String =
+        columnNameOrDefault(param.annotations, param.name!!.asString())
+
+    private fun columnNameOrDefault(annotations: Sequence<KSAnnotation>, default: String): String {
+        val explicit = findAnnotationArg(annotations, COLUMN_INFO_ANNOTATION, "name")
+        return if (explicit.isNullOrEmpty()) default else explicit
     }
 
     private fun findAnnotationArg(
@@ -114,6 +194,7 @@ internal class RoomQlProcessor(private val environment: SymbolProcessorEnvironme
 private fun KSPropertyDeclaration.hasAnnotation(annotationFqn: String): Boolean =
     annotations.any { it.annotationType.resolve().declaration.qualifiedName?.asString() == annotationFqn }
 
+/** Registered via `META-INF/services`; generates `*Table` objects for `@Entity` and factories for `@Projection`. */
 public class RoomQlProcessorProvider : SymbolProcessorProvider {
     override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor =
         RoomQlProcessor(environment)

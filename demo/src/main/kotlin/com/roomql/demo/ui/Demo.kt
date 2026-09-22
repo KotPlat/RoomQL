@@ -35,4 +35,10 @@ enum class Demo(
         summary = "Debounced input over a Flow query, including the observedEntities " +
             "trap that silently stops a Flow from re-emitting.",
     ),
+    BrandSummary(
+        route = "brand-summary",
+        title = "Brand summary",
+        summary = "Per-brand product count and average price via groupBy + select + " +
+            "aggregates, joined to brands for the real name.",
+    ),
 }

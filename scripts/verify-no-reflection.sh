@@ -14,11 +14,15 @@
 # Scans the real published artifacts rather than build output, so it checks what users
 # actually resolve.
 #
-# Usage: scripts/verify-no-reflection.sh [version]     (default: 2.0.0)
+# Usage: scripts/verify-no-reflection.sh [version]     (default: the latest X.Y.Z release tag)
 
 set -euo pipefail
 
-VERSION="${1:-2.0.0}"
+VERSION="${1:-$("$(dirname "$0")/latest-release-version.sh")}"
+if [[ -z "$VERSION" ]]; then
+    echo "error: no version given and no X.Y.Z release tag found in history" >&2
+    exit 1
+fi
 REPO="${HOME}/.m2/repository/io/github/kotplat/roomql"
 
 RUNTIME_JAR="${REPO}/runtime/${VERSION}/runtime-${VERSION}.jar"

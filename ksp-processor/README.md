@@ -12,6 +12,8 @@ plugins { id("com.google.devtools.ksp") }
 dependencies { ksp("io.github.kotplat.roomql:ksp-processor:2.0.0") }
 ```
 
+Keep it on the same version as `runtime`: the generated code calls runtime symbols by name, so a mismatch surfaces as an unresolved `*Projection` or `*Table` reference, not a version error.
+
 Given this entity:
 
 ```kotlin
@@ -23,19 +25,17 @@ data class UserEntity(
 )
 ```
 
-the processor generates:
+the processor generates `UserEntityTable` in the same package on your next build. You never write it yourself; you only reference its members:
 
-```kotlin
-object UserEntityTable : EntityTable {
-    override val tableName = "users"
-    override val allColumnNames = listOf("id", "name", "created_at")
-    val id: Column<Int> = Column("id", "users")
-    val name: Column<String> = Column("name", "users")
-    val createdAt: Column<Long> = Column("created_at", "users")   // @ColumnInfo name in SQL
-}
-```
+| Reference | Type | SQL name |
+|---|---|---|
+| `UserEntityTable.id` | `Column<Int>` | `id` |
+| `UserEntityTable.name` | `Column<String>` | `name` |
+| `UserEntityTable.createdAt` | `Column<Long>` | `created_at` (from `@ColumnInfo`) |
 
 `@Entity(tableName = ...)` and `@ColumnInfo(name = ...)` are respected, so the generated refs carry the real SQL names, and `@Ignore`d properties are skipped — they are not columns. Rename a property or a column and every query that used it stops compiling.
+
+It also reads `@com.roomql.runtime.Projection`: annotate a result data class and it generates `<ClassName>Projection(...)` — one `Expression<T>` parameter per constructor property, aliased from `@ColumnInfo(name = ...)`, with the class's own visibility — to spread into `select(...)` instead of hand-writing `alias` calls. See the [Usage Guide](../docs/USAGE.md#generating-the-projections-aliases-with-projection).
 
 ## Options
 
