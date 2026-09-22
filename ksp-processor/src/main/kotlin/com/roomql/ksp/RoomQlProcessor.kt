@@ -100,12 +100,7 @@ internal class RoomQlProcessor(private val environment: SymbolProcessorEnvironme
             .writeTo(environment.codeGenerator, aggregating = false)
     }
 
-    /**
-     * Generates `<ClassName>Projection(...)`: one `Expression<T>` parameter per primary
-     * constructor property, in declaration order, returning the aliased expressions ready
-     * to spread into `select(...)`. A missing argument is then a plain Kotlin compile error
-     * at the call site — the same mechanism as forgetting a constructor argument.
-     */
+    /** Generates `<ClassName>Projection(...)`: one `Expression<T>` per constructor property, returned aliased. */
     private fun generateProjectionFactory(classDecl: KSClassDeclaration) {
         val packageName = classDecl.packageName.asString()
         val className = classDecl.simpleName.asString()
@@ -199,25 +194,7 @@ internal class RoomQlProcessor(private val environment: SymbolProcessorEnvironme
 private fun KSPropertyDeclaration.hasAnnotation(annotationFqn: String): Boolean =
     annotations.any { it.annotationType.resolve().declaration.qualifiedName?.asString() == annotationFqn }
 
-/**
- * KSP's entry point into RoomQL's code generator. Registered through `META-INF/services`, so
- * applying the `com.google.devtools.ksp` plugin and adding `ksp("io.github.kotplat.roomql:ksp-processor:...")`
- * is all a consumer needs — you never reference this type directly.
- *
- * The processor it creates does two things, driven by annotations on your own source:
- * - For every `@Entity`-annotated class, generates `object <EntityName>Table : EntityTable`
- *   (suffix configurable via the `roomql.tableSuffix` option) in the same package, with a
- *   typed [Column][com.roomql.runtime.Column] per property. Honours `@Entity(tableName = ...)`,
- *   `@ColumnInfo(name = ...)`, and skips `@Ignore`d properties.
- * - For every `@Projection`-annotated (`com.roomql.runtime.Projection`) data class, generates
- *   `<ClassName>Projection(...)` in the same package — one `Expression<T>` parameter per
- *   primary-constructor property, aliased from `@ColumnInfo(name = ...)` — to spread into
- *   `select(...)`.
- *
- * A class whose symbols aren't yet resolvable in the current round (`validate()` returns
- * `false`) is deferred to a later KSP processing round rather than generated incorrectly or
- * skipped.
- */
+/** Registered via `META-INF/services`; generates `*Table` objects for `@Entity` and factories for `@Projection`. */
 public class RoomQlProcessorProvider : SymbolProcessorProvider {
     override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor =
         RoomQlProcessor(environment)
