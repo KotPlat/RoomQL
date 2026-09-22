@@ -182,4 +182,105 @@ class RoomQlProcessorTest {
         assertTrue("UserEntityTable.kt" in generatedNames)
         assertTrue("PostEntityTable.kt" in generatedNames)
     }
+
+    // --- @Projection: generates a typed factory function ---
+
+    @Test
+    fun `generates a projection factory with one Expression parameter per constructor property`() {
+        val projection = fixture("CategorySummary.kt")
+
+        val (result, compilation) = compile(projection)
+
+        assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode)
+
+        val generated = findGeneratedFile(compilation, "CategorySummaryProjection.kt").readText()
+        assertTrue("fun CategorySummaryProjection(" in generated)
+        assertTrue("categoryId: Expression<Int>" in generated)
+        assertTrue("categoryName: Expression<String>" in generated)
+        assertTrue("productCount: Expression<Long>" in generated)
+        assertTrue("Array<Expression<*>>" in generated)
+    }
+
+    @Test
+    fun `projection factory aliases each expression to its ColumnInfo name, defaulting to the property name`() {
+        val projection = fixture("CategorySummary.kt")
+
+        val (result, compilation) = compile(projection)
+
+        assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode)
+
+        val generated = findGeneratedFile(compilation, "CategorySummaryProjection.kt").readText()
+        assertTrue("categoryId alias \"category_id\"" in generated)
+        assertTrue("categoryName alias \"category_name\"" in generated)
+        // No @ColumnInfo on productCount, so it falls back to the property's own name.
+        assertTrue("productCount alias \"productCount\"" in generated)
+    }
+
+    @Test
+    fun `a full call to the generated projection factory compiles`() {
+        val projection = fixture("CategorySummary.kt")
+        val caller = SourceFile.kotlin(
+            "UseProjection.kt",
+            """
+            package test
+            import com.roomql.runtime.Column
+
+            fun useProjection() {
+                val id = Column<Int>("category_id", "categories")
+                val name = Column<String>("category_name", "categories")
+                val count = Column<Long>("product_count", "categories")
+                val projected = CategorySummaryProjection(id, name, count)
+            }
+            """.trimIndent(),
+        )
+
+        val (result, _) = compile(projection, caller)
+
+        assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode)
+    }
+
+    @Test
+    fun `a call missing an argument to the generated projection factory fails to compile`() {
+        val projection = fixture("CategorySummary.kt")
+        val caller = SourceFile.kotlin(
+            "UseProjection.kt",
+            """
+            package test
+            import com.roomql.runtime.Column
+
+            fun useProjection() {
+                val id = Column<Int>("category_id", "categories")
+                val name = Column<String>("category_name", "categories")
+                val projected = CategorySummaryProjection(id, name)
+            }
+            """.trimIndent(),
+        )
+
+        val (result, _) = compile(projection, caller)
+
+        assertEquals(KotlinCompilation.ExitCode.COMPILATION_ERROR, result.exitCode)
+    }
+
+    @Test
+    fun `a call with a mismatched Expression type fails to compile`() {
+        val projection = fixture("CategorySummary.kt")
+        val caller = SourceFile.kotlin(
+            "UseProjection.kt",
+            """
+            package test
+            import com.roomql.runtime.Column
+
+            fun useProjection() {
+                val id = Column<Int>("category_id", "categories")
+                val name = Column<String>("category_name", "categories")
+                // productCount wants Expression<Long>, not Expression<Int>.
+                val projected = CategorySummaryProjection(id, name, id)
+            }
+            """.trimIndent(),
+        )
+
+        val (result, _) = compile(projection, caller)
+
+        assertEquals(KotlinCompilation.ExitCode.COMPILATION_ERROR, result.exitCode)
+    }
 }
