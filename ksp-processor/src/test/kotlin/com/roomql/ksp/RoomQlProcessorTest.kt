@@ -202,6 +202,26 @@ class RoomQlProcessorTest {
     }
 
     @Test
+    fun `projection factory for an internal class is internal`() {
+        val projection = SourceFile.kotlin(
+            "InternalSummary.kt",
+            """
+            package test
+            import com.roomql.runtime.Projection
+
+            @Projection
+            internal data class InternalSummary(val total: Long)
+            """.trimIndent(),
+        )
+
+        val (result, compilation) = compile(projection)
+
+        assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode)
+        val generated = findGeneratedFile(compilation, "InternalSummaryProjection.kt").readText()
+        assertTrue("internal fun InternalSummaryProjection(" in generated)
+    }
+
+    @Test
     fun `projection factory aliases each expression to its ColumnInfo name, defaulting to the property name`() {
         val projection = fixture("CategorySummary.kt")
 

@@ -1,5 +1,6 @@
 package com.roomql.ksp
 
+import com.google.devtools.ksp.getVisibility
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
@@ -9,6 +10,7 @@ import com.google.devtools.ksp.symbol.KSAnnotation
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.google.devtools.ksp.symbol.KSValueParameter
+import com.google.devtools.ksp.symbol.Visibility
 import com.google.devtools.ksp.validate
 import com.squareup.kotlinpoet.ARRAY
 import com.squareup.kotlinpoet.ClassName
@@ -141,6 +143,8 @@ internal class RoomQlProcessor(private val environment: SymbolProcessorEnvironme
 
         val funSpec = FunSpec.builder(functionName)
             .apply {
+                if (classDecl.getVisibility() == Visibility.INTERNAL) addModifiers(KModifier.INTERNAL)
+                classDecl.containingFile?.let { addOriginatingKSFile(it) }
                 fields.forEach { (param, _) ->
                     val paramName = param.name!!.asString()
                     val paramType = EXPRESSION_CLASS.parameterizedBy(param.type.resolve().toTypeName())
