@@ -1,5 +1,17 @@
 package com.roomql.runtime
 
+/**
+ * Accumulates a query's shape through its `from`/`join`/`where`/`groupBy`/`having`/`select`/
+ * `orderBy`/`limit`/`offset` calls, then renders it into a [RoomQlQuery] on [build]. This is
+ * the receiver inside [query]'s block; construct it directly only if you need to call [build]
+ * yourself instead of going through [query].
+ *
+ * Every setter here mutates this builder's own state and returns `Unit` rather than a new
+ * instance — there is no immutable/fluent variant. **Not thread-safe**: build a query on one
+ * thread or coroutine, and never share a half-built builder across threads. Marked
+ * [RoomQlDsl] so nested blocks (`where { }`, `join { on { } }`, ...) cannot implicitly call
+ * back out to these members.
+ */
 @RoomQlDsl
 public class QueryBuilder {
     private var fromTable: String? = null
@@ -13,50 +25,109 @@ public class QueryBuilder {
     private var havingScope: HavingScope? = null
     private val selectExpressions = mutableListOf<Expression<*>>()
 
+    /**
+     * Sets the primary table by its raw SQL name. Carries no column metadata, so [build]
+     * throws if this query also has a [join] — RoomQL cannot detect or alias colliding column
+     * names without it. Only meant for a trusted, hard-coded table name; never pass an
+     * untrusted string here, since nothing checks it against your schema.
+     */
     public fun from(tableName: String) {
         fromTable = tableName
     }
 
+    /**
+     * Sets the primary table from a generated `*Table` object. Required if this query also has
+     * a [join], since [EntityTable.allColumnNames] is what lets RoomQL detect and alias
+     * colliding column names across the joined tables.
+     */
     public fun from(table: EntityTable) {
         fromEntityTable = table
         fromTable = table.tableName
     }
 
+    /**
+     * Adds a `JOIN` against [table] of the given [type], with the `ON` predicate declared
+     * inside [block]. Call repeatedly to join more than two tables. Requires [from] to have
+     * been called with a generated `*Table` (not the raw-string overload) — [build] throws
+     * [RoomQlException] otherwise, since joining needs column metadata to alias collisions.
+     */
     public fun join(table: EntityTable, type: JoinType, block: JoinScope.() -> Unit) {
         val scope = JoinScope().apply(block)
         joins.add(JoinClause(table, type, scope.onCondition))
     }
 
+    /**
+     * Opens a [WhereScope] and applies [block] to it. Calling `where` more than once on the
+     * same builder merges every block's conditions into one AND-combined set — each call
+     * *adds* conditions, it never replaces the previous ones — which is what lets you build up
+     * a `WHERE` clause from ordinary Kotlin control flow across several calls.
+     */
     public fun where(block: WhereScope.() -> Unit) {
         val scope = whereScope ?: WhereScope().also { whereScope = it }
         scope.apply(block)
     }
 
+    /**
+     * Appends a sort key. Call repeatedly for a multi-column `ORDER BY`, rendered in call
+     * order. Accepts any [Expression] — a bare [Column] or an aggregate — since SQL allows
+     * both in `ORDER BY`.
+     */
     public fun orderBy(expression: Expression<*>, direction: SortDirection) {
         orderByClauses.add(expression to direction)
     }
 
+    /** Sets `LIMIT`. Repeated calls overwrite the previous value. [build] throws unless [n] is positive. */
     public fun limit(n: Int) {
         limitValue = n
     }
 
+    /**
+     * Sets `OFFSET`. Repeated calls overwrite the previous value. [build] throws unless [limit]
+     * has also been set — a SQLite restriction on bare `OFFSET`, not a RoomQL one.
+     */
     public fun offset(n: Int) {
         offsetValue = n
     }
 
+    /**
+     * Adds a column to `GROUP BY`. Call repeatedly for a multi-column `GROUP BY`, rendered in
+     * call order. Takes [Column] only, never an aggregate — `GROUP BY COUNT(x)` is meaningless
+     * SQL.
+     */
     public fun groupBy(column: Column<*>) {
         groupByColumns.add(column)
     }
 
+    /**
+     * Opens a [HavingScope] and applies [block] to it, the same merging behaviour as [where].
+     * [build] throws [RoomQlException] unless [groupBy] has also been called at least once.
+     */
     public fun having(block: HavingScope.() -> Unit) {
         val scope = havingScope ?: HavingScope().also { havingScope = it }
         scope.apply(block)
     }
 
+    /**
+     * Projects specific columns and aggregates instead of whole rows. Left out entirely,
+     * [build] renders `SELECT *` with automatic `JOIN`-collision aliasing; calling this even
+     * once switches that off — [expressions] becomes the complete, explicit set of returned
+     * columns. Repeated calls accumulate rather than replace, so the arguments across every
+     * call form one projection list.
+     *
+     * [build] rejects two shapes that would otherwise let SQLite pick an arbitrary row's value
+     * silently: a grouped projection with a bare [Column] missing from [groupBy], and an
+     * ungrouped projection mixing an aggregate with a bare column.
+     */
     public fun select(vararg expressions: Expression<*>) {
         selectExpressions.addAll(expressions)
     }
 
+    /**
+     * Validates the configured query and renders it into a [RoomQlQuery]. [query] calls this
+     * for you; call it directly only if you built this [QueryBuilder] yourself. Throws
+     * [RoomQlException] for every invalid configuration documented there. Safe to call more
+     * than once — it re-renders the builder's current state each time rather than consuming it.
+     */
     public fun build(): RoomQlQuery {
         val table = fromTable ?: throw RoomQlException("from() must be called before build()")
         val limit = limitValue
@@ -190,6 +261,11 @@ private fun StringBuilder.appendConditions(
         renderCondition(c, args, this, collidingNames)
     }
 
+/**
+ * RoomQL's entry point. Applies [block] to a fresh [QueryBuilder], calls
+ * [QueryBuilder.build], and returns the finished [RoomQlQuery]. Throws [RoomQlException] if
+ * the configured query is invalid.
+ */
 public fun query(block: QueryBuilder.() -> Unit): RoomQlQuery = QueryBuilder().apply(block).build()
 
 private fun StringBuilder.appendSelectWithAliasing(primary: EntityTable, joins: List<JoinClause>, collidingNames: Set<String>) {
