@@ -61,7 +61,7 @@ All six return a nullable `Expression<T>` — SQL returns `NULL` for an empty gr
 | Return several named columns/aggregates | `select(col alias "name", count(other) alias "other_count", ...)` |
 | Generate those aliases from a result class instead of hand-writing them | Annotate the class `@Projection` — KSP generates `<ClassName>Projection(...)`, spread it into `select(*...)` |
 
-`select(...)` switches off automatic JOIN-collision aliasing — its argument list becomes the complete, explicit set of returned columns. `build()` rejects a grouped projection with a bare column missing from `GROUP BY`, and an ungrouped projection mixing an aggregate with a bare column — both would otherwise let SQLite pick an arbitrary row's value silently.
+`select(...)` switches off automatic JOIN-collision aliasing — its argument list becomes the complete, explicit set of returned columns. `build()` rejects a grouped projection with a bare column missing from `GROUP BY`, an ungrouped projection mixing an aggregate with a bare column, and two items sharing one output name — each would otherwise map the wrong value silently. An aliased item only compiles inside `select(...)`.
 
 ---
 
@@ -86,7 +86,9 @@ Joining requires `from(EntityTable)` (not the raw-string `from(String)` overload
 | `offset()` without `limit()` | `offset() requires limit() to be set` |
 | `having { }` without `groupBy()` | `having() requires groupBy() to be set` |
 | `join()` after `from(String)` | `join() requires from(EntityTable) so columns can be aliased; from(String) has no column metadata` |
-| `select(...)` grouped bare column missing from `groupBy()` | `select { } column(s) not in groupBy(): <names>` |
-| `select(...)` mixing an aggregate with a bare column, ungrouped | `select { } cannot mix an aggregate with a bare column unless groupBy() is set` |
+| `select(...)` grouped bare column missing from `groupBy()` | `select(...) column(s) not in groupBy(): <names>` |
+| `select(...)` mixing an aggregate with a bare column, ungrouped | `select(...) cannot mix an aggregate with a bare column unless groupBy() is set` |
+| `alias()` name containing a backtick | `alias() names cannot contain a backtick: <names>` |
+| `select(...)` items sharing an output name | `select(...) returns more than one column named: <names>; alias all but one` |
 
 Full detail on every entry above, including exact signatures and more generated-SQL examples, is in the [API Reference](API.md) and [Usage Guide](USAGE.md).

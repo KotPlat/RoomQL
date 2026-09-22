@@ -184,7 +184,7 @@ RoomQL's entire public surface, across all three artifacts. Signatures, generic 
 | [`Column<T>`](docs/API.md#column) | runtime | A typed column reference. Generated per entity property, never hand-written. |
 | [`count`, `countAll`, `sum`, `avg`, `min`, `max`](docs/API.md#aggregate-functions) | runtime | `Expression<T>` factories for `having { }`, `orderBy`, and `select`. `count`/`countAll` differ under a `LEFT JOIN`; `sum`/`avg` require a numeric column. |
 | [`select`](docs/API.md#projections) | runtime | Projects specific columns/aggregates instead of whole rows. Switches off automatic JOIN-collision aliasing when present. |
-| [`alias`](docs/API.md#projections) | runtime | Names an expression's output column — the escape hatch for shapes `@Projection` can't model. |
+| [`alias`](docs/API.md#projections) | runtime | Names an expression's output column as a `SelectItem`, accepted only by `select(...)` — the escape hatch for shapes `@Projection` can't model. |
 | [`@Projection`](docs/API.md#projections) | runtime / ksp-processor | Annotates a result data class; KSP generates `<ClassName>Projection(...)`, one typed `Expression<T>` parameter per property, to spread into `select(...)`. |
 | [`EntityTable`](docs/API.md#entitytable) | runtime | Implemented by every generated `*Table`: `tableName`, `allColumnNames`. |
 | [`RoomQlQuery`](docs/API.md#roomqlquery) | runtime | The DSL's output: `sql` plus positional `args`. Pure JVM — assert on it in unit tests. |
@@ -197,7 +197,7 @@ RoomQL's entire public surface, across all three artifacts. Signatures, generic 
 
 | Approach | Whole-query SQL checked? | Dynamic sort/group column | Dynamic `SELECT` list | Optional filter values | Cost |
 |---|---|---|---|---|---|
-| **RoomQL** | No — `@RawQuery` skips it | Yes — a real `Column<T>`, checked at compile time | Yes — `select(...)`, same typed references | Native — `null` drops the condition | Three artifacts, a `.toQuery()` call, no whole-query SQL validation |
+| **RoomQL** | No — `@RawQuery` skips it | Yes — a real `Column<T>`, checked at compile time | Yes — `select(...)`, same typed references | Native — `null` drops the condition | Two dependency lines, a `.toQuery()` call, no whole-query SQL validation |
 | Room `@Query` string | Yes, at compile time | Via a `CASE WHEN :sortBy = ... THEN col` ladder, bound to a string — works, unreadable past one axis | No static way to vary the column list at all | `(:x IS NULL OR col = :x)` per filter — works fine | None; this is Room's default, best-checked path when your query is otherwise static |
 | Overloaded DAO methods | Yes, each method's SQL is checked | One static method per column/direction — fine for a small, fixed set | One method per projection shape you need | One method per filter combination (2ⁿ) | Grows combinatorially once more than one axis varies at once |
 | Hand-built `SimpleSQLiteQuery` | No — you concatenate strings | Yes, nothing checked at compile time | Yes, nothing checked at compile time | Manual `if` ladders | Zero dependencies; every injection, column-typo, and arg-ordering bug is yours |

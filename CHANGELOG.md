@@ -11,20 +11,19 @@ All notable changes to **RoomQL** are documented here. The format follows
 - **Aggregate functions**: `count`, `countAll`, `sum`, `avg`, `min`, `max` as `Expression<T>`
   factories, usable in `having { }` and `orderBy`. `count`/`countAll` are kept separate because
   they differ under a `LEFT JOIN`; `sum`/`avg` are constrained to numeric columns. See #72.
-- **`groupBy()` is additive**: repeated calls now append instead of overwriting, so
-  `GROUP BY a, b` is expressible as `groupBy(a); groupBy(b)`, matching `orderBy`'s existing
-  precedent. See #75.
-- **`select(vararg expressions: Expression<*>)`**: projects specific columns and aggregates
+- **`select(vararg items: SelectItem<*>)`**: projects specific columns and aggregates
   instead of whole rows, switching off v1's automatic JOIN-collision aliasing when present. A
   single unaliased expression needs no name — Room binds it straight to a scalar return type.
-  The `alias` infix names a column for the multi-column case. `build()` rejects a grouped
-  projection with a bare column missing from `groupBy()`, and an ungrouped projection mixing
-  an aggregate with a bare column. See #73.
+  The `alias` infix names a column for the multi-column case; it renders backtick-quoted and
+  returns a `SelectItem` rather than an `Expression`, so an aliased value only compiles inside
+  `select(...)`. `build()` rejects a grouped projection with a bare column missing from
+  `groupBy()`, an ungrouped projection mixing an aggregate with a bare column, and two items
+  sharing one output name. See #73.
 - **`@Projection`-generated factory functions for multi-column `select(...)`**: annotate a
   result data class with `@Projection` and the KSP processor generates `<ClassName>Projection(...)`
   — one `Expression<T>` parameter per constructor property, honouring `@ColumnInfo(name = ...)`
-  for the alias — so a missing or mismatched-type argument is an ordinary Kotlin compile error
-  at the call site, the same as forgetting a constructor argument. The `alias` infix remains the
+  for the alias and the annotated class's visibility — so a missing or mismatched-type argument
+  is an ordinary Kotlin compile error at the call site, the same as forgetting a constructor argument. The `alias` infix remains the
   escape hatch for shapes `@Projection` can't model. See #74.
 - **Maven Central publishing.** All three artifacts publish under a new groupId,
   `io.github.kotplat.roomql`, with `roomql-` prefixes dropped from the artifactIds
@@ -38,6 +37,9 @@ All notable changes to **RoomQL** are documented here. The format follows
 
 ### Changed — breaking
 
+- **`groupBy()` is additive**: repeated calls now append instead of overwriting, so
+  `groupBy(a); groupBy(b)` renders `GROUP BY a, b` where 1.x kept only `b`. Code that called it
+  twice expecting the last call to win now groups by both columns. See #75.
 - **`Expression<T>` becomes the root type behind `having { }` and `orderBy`**, with `Column<T>`
   implementing it. `where { }`'s operators and `groupBy()` deliberately stay `Column<T>`-only —
   SQL forbids aggregates in both positions. See #71.
