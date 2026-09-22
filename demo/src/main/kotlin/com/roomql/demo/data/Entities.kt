@@ -46,3 +46,10 @@ data class ProductWithBrand(
     @ColumnInfo(name = "category") val category: String,
     @ColumnInfo(name = "price") val price: Double,
 )
+
+/** Result shape for the brand summary screen's grouped, aggregated `select(...)`. */
+data class BrandSummary(
+    @ColumnInfo(name = "brand_name") val brandName: String,
+    @ColumnInfo(name = "product_count") val productCount: Int,
+    @ColumnInfo(name = "avg_price") val avgPrice: Double,
+)

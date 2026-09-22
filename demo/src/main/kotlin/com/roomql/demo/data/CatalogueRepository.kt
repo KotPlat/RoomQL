@@ -4,6 +4,9 @@ import com.roomql.android.toQuery
 import com.roomql.runtime.Column
 import com.roomql.runtime.JoinType
 import com.roomql.runtime.SortDirection
+import com.roomql.runtime.alias
+import com.roomql.runtime.avg
+import com.roomql.runtime.count
 import com.roomql.runtime.query
 import kotlinx.coroutines.flow.Flow
 
@@ -60,6 +63,29 @@ class CatalogueRepository(
             offset(offset)
         }
         return QueryResult(productDao.search(q.toQuery()), q.sql)
+    }
+
+    /**
+     * Per-brand rollup: product count and average price, grouped and joined for the real
+     * brand name. `where { }`, `groupBy(...)`, and `select(...)` compose in one query here.
+     */
+    fun brandSummary(inStockOnly: Boolean): QueryResult<BrandSummary> {
+        val q = query {
+            from(ProductEntityTable)
+            join(BrandEntityTable, JoinType.INNER) {
+                on { ProductEntityTable.brandId eq BrandEntityTable.id }
+            }
+            where { ProductEntityTable.inStock eqIfNotNull inStockOnly.takeIf { it } }
+            groupBy(BrandEntityTable.id)
+            groupBy(BrandEntityTable.name) // selected below, so it must be grouped too
+            select(
+                BrandEntityTable.name alias "brand_name",
+                count(ProductEntityTable.id) alias "product_count",
+                avg(ProductEntityTable.price) alias "avg_price",
+            )
+            orderBy(BrandEntityTable.name, SortDirection.ASC)
+        }
+        return QueryResult(productDao.brandSummary(q.toQuery()), q.sql)
     }
 
     /** Reactive search. Re-emits because ProductDao.observe declares observedEntities. */

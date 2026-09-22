@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.roomql.demo.ui.brandsummary.BrandSummaryScreen
 import com.roomql.demo.ui.components.DemoTopBar
 import com.roomql.demo.ui.components.RoomQlLogo
 import com.roomql.demo.ui.faceted.FacetedScreen
@@ -49,6 +50,9 @@ fun DemoApp() {
         }
         composable(Demo.TypeAhead.route) {
             TypeAheadScreen(onBack = { navController.popBackStack() })
+        }
+        composable(Demo.BrandSummary.route) {
+            BrandSummaryScreen(onBack = { navController.popBackStack() })
         }
     }
 }
@@ -101,7 +105,7 @@ private fun Banner() {
                 color = RoomQlBrand.Green,
             )
             Text(
-                "Type-safe filters that disappear when null — no raw SQL, no 2ⁿ DAO methods.",
+                "Type-safe queries whose structure — sort, group, join — is decided at runtime, not just their filter values.",
                 style = MaterialTheme.typography.bodySmall,
                 color = androidx.compose.ui.graphics.Color(0xFFBDBDBD),
                 modifier = Modifier.padding(top = 4.dp),
