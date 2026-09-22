@@ -2,7 +2,7 @@
 
 Every operator in the **RoomQL 2.0.0** DSL, the SQL each one generates, and the idioms for joins, `Flow`, error handling, and testing. For the pitch, installation, API reference, and limitations, see the [main README](../README.md).
 
-RoomQL is a type-safe Kotlin DSL that builds a Room `@RawQuery` at runtime, so a search screen whose filters are chosen by the user needs neither `(:minAge IS NULL OR age >= :minAge)` string tricks nor one DAO method per filter combination. This guide assumes you have added the three artifacts — `runtime`, `runtime-android`, and `ksp-processor` (all under `io.github.kotplat.roomql`) — as shown in the [installation section](../README.md#installation).
+RoomQL is a type-safe Kotlin DSL that builds a Room `@RawQuery` at runtime. Optional filter *values* have a fine static answer already (`(:x IS NULL OR col = :x)` on a plain `@Query`); RoomQL's actual job is queries whose *structure* also varies — which column to sort or group by, whether a join is present, which columns to project — with a typed `Column<T>` in place of a `CASE` ladder or a bare string. See the [main README](../README.md#how-roomql-compares-to-the-alternatives) for the full comparison, including which of those are merely awkward in static SQL and which are genuinely impossible. This guide assumes you have added the three artifacts — `runtime`, `runtime-android`, and `ksp-processor` (all under `io.github.kotplat.roomql`) — as shown in the [installation section](../README.md#installation).
 
 Every example shows the **Kotlin** you write and the **SQL** RoomQL generates, so you can see exactly what reaches SQLite.
 
@@ -431,7 +431,7 @@ A single unaliased expression needs no name at all — Room binds it straight to
 @RawQuery fun countByCategory(q: SupportSQLiteQuery): Int
 ```
 
-A multi-column projection names each output with the `alias` infix — the escape hatch for custom result classes until a `@RoomQlProjection` descriptor can generate the names for you:
+A multi-column projection names each output with the `alias` infix:
 
 ```kotlin
 query {
@@ -454,6 +454,33 @@ SELECT customerId, COUNT(id) AS order_count FROM orders GROUP BY customerId
 - An **ungrouped** query mixing an aggregate with a bare column — the same hole, without an explicit `GROUP BY` to name.
 
 An ungrouped, aggregate-free multi-column projection (`select(a, b)`) is just an ordinary `SELECT a, b` and passes through uncaught.
+
+### Generating the projection's aliases with @Projection
+
+Hand-written `alias` calls are easy to get out of sync with the result class they feed: rename a field, forget to update the string, and the mismatch surfaces as a silently unmapped column, not a compile error. Annotate the result class with `@Projection` instead, and RoomQL's KSP processor generates a typed factory function alongside it:
+
+```kotlin
+import com.roomql.runtime.Projection
+
+@Projection
+data class CustomerOrderCount(
+    val customerId: Int,
+    @ColumnInfo(name = "order_count") val orderCount: Long,
+)
+// generates CustomerOrderCountProjection(customerId: Expression<Int>, orderCount: Expression<Long>): Array<Expression<*>>
+```
+
+Spread the generated function's result into `select(...)`:
+
+```kotlin
+query {
+    from(OrderEntityTable)
+    groupBy(OrderEntityTable.customerId)
+    select(*CustomerOrderCountProjection(OrderEntityTable.customerId, count(OrderEntityTable.id)))
+}
+```
+
+Leaving out `orderCount` — or passing an `Expression<Int>` where `Expression<Long>` is expected — is a Kotlin compile error at that call, the same as forgetting a constructor argument. `@Projection` only covers this constructor-property shape; a result class KSP can't model that way still uses the plain `alias` infix.
 
 ---
 

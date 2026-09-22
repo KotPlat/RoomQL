@@ -4,7 +4,7 @@ All notable changes to **RoomQL** are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and RoomQL follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.0] - 2026-09-23
 
 ### Added
 
@@ -17,21 +17,15 @@ All notable changes to **RoomQL** are documented here. The format follows
 - **`select(vararg expressions: Expression<*>)`**: projects specific columns and aggregates
   instead of whole rows, switching off v1's automatic JOIN-collision aliasing when present. A
   single unaliased expression needs no name — Room binds it straight to a scalar return type.
-  The `alias` infix names a column for the multi-column case, ahead of a KSP-generated
-  `@RoomQlProjection` descriptor. `build()` rejects a grouped projection with a bare column
-  missing from `groupBy()`, and an ungrouped projection mixing an aggregate with a bare
-  column. See #73.
-
-### Changed — breaking
-
-- **`Expression<T>` becomes the root type behind `having { }` and `orderBy`**, with `Column<T>`
-  implementing it. `where { }`'s operators and `groupBy()` deliberately stay `Column<T>`-only —
-  SQL forbids aggregates in both positions. See #71.
-
-## [2.0.0] - 2026-09-19
-
-### Added
-
+  The `alias` infix names a column for the multi-column case. `build()` rejects a grouped
+  projection with a bare column missing from `groupBy()`, and an ungrouped projection mixing
+  an aggregate with a bare column. See #73.
+- **`@Projection`-generated factory functions for multi-column `select(...)`**: annotate a
+  result data class with `@Projection` and the KSP processor generates `<ClassName>Projection(...)`
+  — one `Expression<T>` parameter per constructor property, honouring `@ColumnInfo(name = ...)`
+  for the alias — so a missing or mismatched-type argument is an ordinary Kotlin compile error
+  at the call site, the same as forgetting a constructor argument. The `alias` infix remains the
+  escape hatch for shapes `@Projection` can't model. See #74.
 - **Maven Central publishing.** All three artifacts publish under a new groupId,
   `io.github.kotplat.roomql`, with `roomql-` prefixes dropped from the artifactIds
   (`roomql-runtime` → `runtime`, `roomql-runtime-android` → `runtime-android`,
@@ -43,6 +37,10 @@ All notable changes to **RoomQL** are documented here. The format follows
   manual review — publishing itself stays a deliberate human step. See #66.
 
 ### Changed — breaking
+
+- **`Expression<T>` becomes the root type behind `having { }` and `orderBy`**, with `Column<T>`
+  implementing it. `where { }`'s operators and `groupBy()` deliberately stay `Column<T>`-only —
+  SQL forbids aggregates in both positions. See #71.
 
 - **Every value-taking condition operator splits into a required and an optional form.**
   `eq`, `gte`, `like`, `inList`, `between`, and the rest now take `T & Any` and will not
@@ -133,7 +131,8 @@ without `limit()`, a `having()` without `groupBy()`, and a `join()` on a raw-str
 
 Annotation-driven DAO generation. KSP cannot read function bodies, so the query and its
 `observedEntities` cannot be inferred from an annotated method. The exploration lives on the
-`development` branch and is tracked for v2 in
+`development` branch; the rationale and the compiler-plugin alternative that was considered
+and deferred are documented in the closed issues
 [#6](https://github.com/KotPlat/RoomQL/issues/6) and
 [#13](https://github.com/KotPlat/RoomQL/issues/13).
 

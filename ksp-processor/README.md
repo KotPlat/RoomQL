@@ -37,6 +37,8 @@ object UserEntityTable : EntityTable {
 
 `@Entity(tableName = ...)` and `@ColumnInfo(name = ...)` are respected, so the generated refs carry the real SQL names, and `@Ignore`d properties are skipped — they are not columns. Rename a property or a column and every query that used it stops compiling.
 
+It also reads `@com.roomql.runtime.Projection`: annotate a result data class and it generates `<ClassName>Projection(...)` — one `Expression<T>` parameter per constructor property, aliased from `@ColumnInfo(name = ...)` — to spread into `select(...)` instead of hand-writing `alias` calls. See the [Usage Guide](../docs/USAGE.md#generating-the-projections-aliases-with-projection).
+
 ## Options
 
 | KSP option | Default | Effect |

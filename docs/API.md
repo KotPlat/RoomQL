@@ -171,7 +171,8 @@ query {
 ### Projections
 
 ```kotlin
-public fun QueryBuilder.select(vararg expressions: Expression<*>)
+// QueryBuilder member — see QueryBuilder above
+public fun select(vararg expressions: Expression<*>)
 public infix fun <T> Expression<T>.alias(name: String): Expression<T>
 ```
 
@@ -186,7 +187,7 @@ val q = query {
 // SELECT COUNT(*) FROM products WHERE category = ?
 ```
 
-A single unaliased expression needs no name — Room binds it straight to a scalar return type (`Int`, `Long`, …), exactly like any other query. `alias` names an expression's output column, for a multi-column projection with no `@RoomQlProjection` descriptor:
+A single unaliased expression needs no name — Room binds it straight to a scalar return type (`Int`, `Long`, …), exactly like any other query. `alias` names an expression's output column, for a multi-column projection:
 
 ```kotlin
 select(
@@ -201,6 +202,53 @@ select(
 - A **grouped** query (`groupBy(...)` set) whose projection has a bare column absent from `GROUP BY` throws — SQLite would otherwise pick an arbitrary row's value for it.
 - An **ungrouped** query mixing an aggregate with a bare column throws for the same reason, without an explicit `GROUP BY` to name.
 - An ungrouped, aggregate-free multi-column projection (`select(a, b)`) passes through uncaught — an ordinary `SELECT a, b`, nothing unsafe about it.
+
+#### @Projection: a generated factory instead of hand-written `alias` calls
+
+```kotlin
+public annotation class Projection
+```
+
+Annotate a result data class whose primary constructor describes a multi-column projection, and the KSP processor generates `<ClassName>Projection(...)` in the same package: one `Expression<T>` parameter per constructor property, in declaration order, returning `Array<Expression<*>>` ready to spread into `select(...)`. A property's `@ColumnInfo(name = ...)` becomes that parameter's alias; without one, the alias falls back to the property's own name — the same rule the `*Table` generator uses for column names.
+
+Each generated parameter is a plain `Expression<T>` — nothing about the generator is specific to `count`. A `Column<T>` and any of the six aggregate functions (`count`, `countAll`, `sum`, `avg`, `min`, `max`) all satisfy it interchangeably, so a projection can mix them freely per field:
+
+```kotlin
+@Projection
+data class CategorySummary(
+    @ColumnInfo(name = "category_id") val categoryId: Int,
+    @ColumnInfo(name = "category_name") val categoryName: String,
+    val productCount: Long,
+    @ColumnInfo(name = "avg_price") val avgPrice: Double?,
+)
+
+// generates, in the same package:
+public fun CategorySummaryProjection(
+    categoryId: Expression<Int>,
+    categoryName: Expression<String>,
+    productCount: Expression<Long>,
+    avgPrice: Expression<Double?>,
+): Array<Expression<*>> = arrayOf(
+    categoryId alias "category_id",
+    categoryName alias "category_name",
+    productCount alias "productCount",
+    avgPrice alias "avg_price",
+)
+```
+
+```kotlin
+select(
+    *CategorySummaryProjection(
+        CategoryTable.id,          // a bare Column<Int>
+        CategoryTable.name,        // a bare Column<String>
+        count(ProductTable.id),    // an aggregate — could just as well be sum, min, or max
+        avg(ProductTable.price),
+    )
+)
+// SELECT id AS category_id, name AS category_name, COUNT(id) AS productCount, AVG(price) AS avg_price FROM ...
+```
+
+A missing or mismatched-type argument to the generated function is then an ordinary Kotlin compile error at the call site — the same mechanism as forgetting a constructor argument — rather than a runtime `RoomQlException`. `@Projection` has `SOURCE` retention: nothing about it survives into the compiled class, consistent with RoomQL's no-reflection guarantee. It only covers the constructor-property shape; for anything else, fall back to the plain `alias` infix.
 
 ### EntityTable
 
@@ -289,10 +337,11 @@ ksp {
 | Annotation | Effect |
 |---|---|
 | `@Entity(tableName = "...")` | Sets the generated `tableName`. Without it, the class name is used. |
-| `@ColumnInfo(name = "...")` | Sets the column's SQL name. The Kotlin property keeps its own name. |
+| `@ColumnInfo(name = "...")` | Sets the column's SQL name, or a `@Projection` parameter's alias. The Kotlin property keeps its own name. |
 | `@Ignore` | The property is skipped — it is not a column. |
+| `@Projection` (`com.roomql.runtime`) | Generates `<ClassName>Projection(...)` instead of a `*Table` object — see [`@Projection`](#projection-a-generated-factory-instead-of-hand-written-alias-calls). |
 
-Nullable properties produce a nullable `Column<T?>`.
+Nullable properties produce a nullable `Column<T?>` (or `Expression<T?>` parameter, for `@Projection`).
 
 ---
 
