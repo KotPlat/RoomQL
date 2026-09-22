@@ -46,7 +46,7 @@ exactly the install path this build exists to verify.
 | **Faceted catalogue** | Multi-select chips driving `IN (...)`, joined to brands — including RoomQL's collision aliasing. |
 | **Sortable, paginated** | Sort column and direction chosen at runtime, with `LIMIT`/`OFFSET` paging. |
 | **Search as you type** | Debounced `contains` over a `Flow`, and the `observedEntities` trap. |
-| **Brand summary** | One row per brand: `groupBy` + `select` + `count`/`avg`, joined for the display name — `where { }`, `groupBy(...)`, and `select(...)` composing in one query. |
+| **Brand summary** | One row per brand: `groupBy` + `select` + `count`/`avg`, joined for the display name — `where { }`, `groupBy(...)`, and `select(...)` composing in one query, with the columns named by a `@Projection` result class instead of hand-written `alias` calls. |
 
 ## The four implementations
 

@@ -7,6 +7,7 @@ import com.roomql.demo.data.BrandSummary
 import com.roomql.demo.data.CatalogueRepository
 import com.roomql.demo.data.DatabaseProvider
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,6 +28,9 @@ class BrandSummaryViewModel(application: Application) : AndroidViewModel(applica
     private val _state = MutableStateFlow(BrandSummaryUiState())
     val state: StateFlow<BrandSummaryUiState> = _state.asStateFlow()
 
+    /** The in-flight query, cancelled whenever a newer one starts so the latest toggle wins. */
+    private var queryJob: Job? = null
+
     init {
         viewModelScope.launch {
             withContext(Dispatchers.IO) { DatabaseProvider.seedIfEmpty(db) }
@@ -40,7 +44,8 @@ class BrandSummaryViewModel(application: Application) : AndroidViewModel(applica
     }
 
     private fun refresh() {
-        viewModelScope.launch {
+        queryJob?.cancel()
+        queryJob = viewModelScope.launch {
             val inStockOnly = _state.value.inStockOnly
             val result = withContext(Dispatchers.IO) { repository.brandSummary(inStockOnly) }
             _state.value = _state.value.copy(rows = result.rows, sql = result.sql)

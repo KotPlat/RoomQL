@@ -66,6 +66,6 @@ fun BrandSummaryScreen(onBack: () -> Unit, viewModel: BrandSummaryViewModel = vi
 private fun BrandSummaryRow(row: BrandSummary) {
     ProductRow(
         title = row.brandName,
-        subtitle = "${row.productCount} products · avg ${"%.2f".format(row.avgPrice)}",
+        subtitle = "${row.productCount} products · avg ${row.avgPrice?.let { "%.2f".format(it) } ?: "—"}",
     )
 }

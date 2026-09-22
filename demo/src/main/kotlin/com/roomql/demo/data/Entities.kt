@@ -3,6 +3,7 @@ package com.roomql.demo.data
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import com.roomql.runtime.Projection
 
 /**
  * The demo catalogue.
@@ -47,9 +48,10 @@ data class ProductWithBrand(
     @ColumnInfo(name = "price") val price: Double,
 )
 
-/** Result shape for the brand summary screen's grouped, aggregated `select(...)`. */
+/** Result shape for the brand summary screen; `@Projection` generates `BrandSummaryProjection(...)` for its `select(...)`. */
+@Projection
 data class BrandSummary(
     @ColumnInfo(name = "brand_name") val brandName: String,
-    @ColumnInfo(name = "product_count") val productCount: Int,
-    @ColumnInfo(name = "avg_price") val avgPrice: Double,
+    @ColumnInfo(name = "product_count") val productCount: Long,
+    @ColumnInfo(name = "avg_price") val avgPrice: Double?,
 )

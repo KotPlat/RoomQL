@@ -39,7 +39,7 @@ class BrandSummaryTest {
         val brandNames = CatalogueSeed.brands().map { it.name }.toSet()
 
         assertEquals(brandNames, result.rows.map { it.brandName }.toSet())
-        assertEquals(CatalogueSeed.PRODUCT_COUNT, result.rows.sumOf { it.productCount })
+        assertEquals(CatalogueSeed.PRODUCT_COUNT.toLong(), result.rows.sumOf { it.productCount })
     }
 
     @Test
@@ -48,7 +48,7 @@ class BrandSummaryTest {
         val expected = CatalogueSeed.products()
             .filter { it.inStock }
             .groupBy { brandNameById.getValue(it.brandId) }
-            .mapValues { (_, rows) -> rows.size to rows.map { it.price }.average() }
+            .mapValues { (_, rows) -> rows.size.toLong() to rows.map { it.price }.average() }
 
         val result = repository.brandSummary(inStockOnly = true)
 
@@ -56,7 +56,7 @@ class BrandSummaryTest {
         for (row in result.rows) {
             val (expectedCount, expectedAvg) = expected.getValue(row.brandName)
             assertEquals(expectedCount, row.productCount)
-            assertEquals(expectedAvg, row.avgPrice, 0.01)
+            assertEquals(expectedAvg, row.avgPrice!!, 0.01)
         }
     }
 

@@ -4,7 +4,6 @@ import com.roomql.android.toQuery
 import com.roomql.runtime.Column
 import com.roomql.runtime.JoinType
 import com.roomql.runtime.SortDirection
-import com.roomql.runtime.alias
 import com.roomql.runtime.avg
 import com.roomql.runtime.count
 import com.roomql.runtime.query
@@ -79,9 +78,11 @@ class CatalogueRepository(
             groupBy(BrandEntityTable.id)
             groupBy(BrandEntityTable.name) // selected below, so it must be grouped too
             select(
-                BrandEntityTable.name alias "brand_name",
-                count(ProductEntityTable.id) alias "product_count",
-                avg(ProductEntityTable.price) alias "avg_price",
+                *BrandSummaryProjection(
+                    BrandEntityTable.name,
+                    count(ProductEntityTable.id),
+                    avg(ProductEntityTable.price),
+                )
             )
             orderBy(BrandEntityTable.name, SortDirection.ASC)
         }
