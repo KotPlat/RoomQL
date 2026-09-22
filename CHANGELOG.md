@@ -18,13 +18,19 @@ All notable changes to **RoomQL** are documented here. The format follows
   returns a `SelectItem` rather than an `Expression`, so an aliased value only compiles inside
   `select(...)`. `build()` rejects a grouped projection with a bare column missing from
   `groupBy()`, an ungrouped projection mixing an aggregate with a bare column, and two items
-  sharing one output name. See #73.
+  sharing one output name (an unaliased aggregate's name is its SQL text, e.g. `COUNT(*)`).
+  `select` takes a vararg rather than the `select { }` block first sketched in #73: its items are
+  plain values, so a block would add a scope with nothing to put in it. See #73.
 - **`@Projection`-generated factory functions for multi-column `select(...)`**: annotate a
   result data class with `@Projection` and the KSP processor generates `<ClassName>Projection(...)`
   — one `Expression<T>` parameter per constructor property, honouring `@ColumnInfo(name = ...)`
   for the alias and the annotated class's visibility — so a missing or mismatched-type argument
   is an ordinary Kotlin compile error at the call site, the same as forgetting a constructor argument. The `alias` infix remains the
-  escape hatch for shapes `@Projection` can't model. See #74.
+  escape hatch for shapes `@Projection` can't model. The factory returns `Array<SelectItem<*>>`,
+  not the typed `Projection<R>` carrier #73/#74 first proposed: Room binds rows to the DAO
+  method's declared return type, which `@RawQuery` never checks against the query, so a `R` on
+  the projection would not be enforced anywhere. The annotation ships as `@Projection` rather
+  than `@RoomQlProjection`, matching the package-qualified name `com.roomql.runtime.Projection`. See #74.
 - **Maven Central publishing.** All three artifacts publish under a new groupId,
   `io.github.kotplat.roomql`, with `roomql-` prefixes dropped from the artifactIds
   (`roomql-runtime` → `runtime`, `roomql-runtime-android` → `runtime-android`,

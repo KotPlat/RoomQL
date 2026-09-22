@@ -161,6 +161,26 @@ class SelectTest {
     }
 
     @Test
+    fun `two identical unaliased aggregates are rejected`() {
+        val error = assertFailsWith<RoomQlException> {
+            query {
+                from("orders")
+                select(countAll(), countAll())
+            }
+        }
+        assertEquals("select(...) returns more than one column named: COUNT(*); alias all but one", error.message)
+    }
+
+    @Test
+    fun `different unaliased aggregates are allowed`() {
+        val result = query {
+            from("orders")
+            select(countAll(), max(Column<Long>("total", "orders")))
+        }
+        assertEquals("SELECT COUNT(*), MAX(total) FROM orders", result.sql)
+    }
+
+    @Test
     fun `select items are covariant in their value type`() {
         val items: Array<SelectItem<Long?>> = arrayOf(countAll() alias "total")
         val result = query {

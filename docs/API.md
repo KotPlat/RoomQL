@@ -207,7 +207,7 @@ The alias is backtick-quoted, so a reserved word (`order`, `group`) works as a n
 
 - A **grouped** query (`groupBy(...)` set) whose projection has a bare column absent from `GROUP BY` throws — SQLite would otherwise pick an arbitrary row's value for it.
 - An **ungrouped** query mixing an aggregate with a bare column throws for the same reason, without an explicit `GROUP BY` to name.
-- Two items with the same output name (an alias, or a bare column's name) throw — Room would bind only one of them. This includes the same column name from two joined tables, such as `select(UserTable.id, OrderTable.id)`: alias all but one.
+- Two items with the same output name (an alias, a bare column's name, or an unaliased aggregate's SQL text such as `COUNT(*)`) throw — Room would bind only one of them. This includes the same column name from two joined tables, such as `select(UserTable.id, OrderTable.id)`: alias all but one.
 - An alias containing a backtick throws, since it cannot be quoted.
 - An ungrouped, aggregate-free multi-column projection (`select(a, b)`) passes through uncaught — an ordinary `SELECT a, b`, nothing unsafe about it.
 
@@ -253,6 +253,8 @@ select(
 ```
 
 A missing or mismatched-type argument to the generated function is then an ordinary Kotlin compile error at the call site — the same mechanism as forgetting a constructor argument — rather than a runtime `RoomQlException`. The generated function takes the annotated class's visibility, so an `internal` class gets an `internal` factory. `@Projection` has `SOURCE` retention: nothing about it survives into the compiled class, consistent with RoomQL's no-reflection guarantee. It only covers the constructor-property shape; for anything else, fall back to the plain `alias` infix.
+
+The factory returns plain `Array<SelectItem<*>>`, not a `Projection<CategorySummary>`. Room binds rows to your DAO method's declared return type, and `@RawQuery` never checks that type against the query, so a type parameter on the projection would have nothing to enforce it. What `@Projection` does guarantee is that every property gets an argument of the right type, under the right alias.
 
 ### EntityTable
 

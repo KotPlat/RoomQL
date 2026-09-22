@@ -80,9 +80,9 @@ public class QueryBuilder {
         roomQlCheck(joins.isEmpty() || entityTable != null) {
             "join() requires from(EntityTable) so columns can be aliased; from(String) has no column metadata"
         }
-        checkSelectProjection()
-
         val collidingNames = collidingColumnNames()
+        checkSelectProjection(collidingNames)
+
         val args = mutableListOf<Any?>()
         val sql = buildString {
             if (selectItems.isNotEmpty()) {
@@ -132,9 +132,9 @@ public class QueryBuilder {
     }
 
     /** Rejects a select(...) that would let Room or SQLite map the wrong value silently. */
-    private fun checkSelectProjection() {
+    private fun checkSelectProjection(collidingNames: Set<String>) {
         if (selectItems.isEmpty()) return
-        val expressions = selectItems.map { it.unaliased() }
+        val expressions = selectItems.map { it.parts().first }
         val bareColumns = expressions.filterIsInstance<Column<*>>()
         val hasAggregate = expressions.any { it is AggregateExpression<*> }
         if (groupByColumns.isNotEmpty()) {
@@ -150,7 +150,7 @@ public class QueryBuilder {
 
         val badAliases = selectItems.filterIsInstance<AliasedExpression<*>>().map { it.alias }.filter { '`' in it }
         roomQlCheck(badAliases.isEmpty()) { "alias() names cannot contain a backtick: ${badAliases.joinToString()}" }
-        val duplicates = selectItems.mapNotNull { it.outputName() }.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
+        val duplicates = selectItems.map { it.outputName(collidingNames) }.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
         roomQlCheck(duplicates.isEmpty()) { "select(...) returns more than one column named: ${duplicates.joinToString()}; alias all but one" }
     }
 
@@ -176,22 +176,23 @@ private fun Expression<*>.render(collidingNames: Set<String>): String = when (th
     is AggregateExpression<*> -> "$sqlFunction(${operand?.render(collidingNames) ?: "*"})"
 }
 
+/** Splits an item into its expression and its alias, or null when unaliased. */
+private fun SelectItem<*>.parts(): Pair<Expression<*>, String?> = when (this) {
+    is Expression<*> -> this to null
+    is AliasedExpression<*> -> expression to alias
+}
+
 // Quoted so a reserved word (`order`, `group`) still works as an alias; SQLite reports the name unquoted.
-private fun SelectItem<*>.renderSelectItem(collidingNames: Set<String>): String = when (this) {
-    is Expression<*> -> render(collidingNames)
-    is AliasedExpression<*> -> "${expression.render(collidingNames)} AS `$alias`"
+private fun SelectItem<*>.renderSelectItem(collidingNames: Set<String>): String {
+    val (expression, alias) = parts()
+    val rendered = expression.render(collidingNames)
+    return if (alias == null) rendered else "$rendered AS `$alias`"
 }
 
-private fun SelectItem<*>.unaliased(): Expression<*> = when (this) {
-    is Expression<*> -> this
-    is AliasedExpression<*> -> expression
-}
-
-/** The column name Room sees for this item, or null for an unaliased aggregate. */
-private fun SelectItem<*>.outputName(): String? = when (this) {
-    is Column<*> -> columnName
-    is AggregateExpression<*> -> null
-    is AliasedExpression<*> -> alias
+/** The column name Room sees: the alias, a bare column's name, or an unaliased aggregate's own SQL text. */
+private fun SelectItem<*>.outputName(collidingNames: Set<String>): String {
+    val (expression, alias) = parts()
+    return alias ?: if (expression is Column<*>) expression.columnName else expression.render(collidingNames)
 }
 
 private fun renderCondition(condition: Condition, args: MutableList<Any?>, sb: StringBuilder, collidingNames: Set<String>) {
