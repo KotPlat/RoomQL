@@ -11,7 +11,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # fetch-depth: 0 so the tag lookup below can see the tag history — the default
+      # shallow checkout has none.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
@@ -37,19 +41,45 @@ jobs:
       - name: Check public API surface
         run: ./gradlew apiCheck
 
+      # Derived from the latest reachable tag rather than hardcoded, so this workflow
+      # never needs a manual edit to track a version bump — release.yml already does
+      # the equivalent from the pushed tag itself; this is the same idea for a plain
+      # branch build that has no tag of its own to publish under.
+      - name: Resolve a version to publish and verify against
+        id: version
+        run: |
+          # `git describe` breaks ties unpredictably when tags share a commit (as
+          # 0.1.0 and 1.0.0 both do here), and the repo also carries non-version
+          # tags (e.g. backup-*) that a naive `--sort=-v:refname | head -1` would
+          # let outrank a real release. Filter to strict X.Y.Z tags first.
+          VERSION="$(git tag --list --sort=-v:refname | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | head -n1)"
+          if [ -z "$VERSION" ]; then
+            echo "::error::No X.Y.Z release tag found in history" >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Using version $VERSION for this run's local publish/verify/demo cycle"
+
       # The demo is a standalone Gradle build consuming RoomQL as published artifacts.
       # Publishing locally first means CI verifies the documented install path, not just
       # that the code compiles.
-      # Published under the exact version demo/gradle/libs.versions.toml asks for, so
-      # mavenLocal() satisfies it. Keep the two in step if the demo's roomql version moves.
       - name: Publish library to Maven local
-        run: VERSION=2.0.0 ./gradlew publishToMavenLocal
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: ./gradlew publishToMavenLocal
 
       # RoomQL promises consumers they need no keep rules. That holds only while the
       # published artifacts stay free of reflection and name derivation, so it is checked
       # against the real jar and aar rather than asserted in the README.
       - name: Verify no reflection in published artifacts
-        run: ./scripts/verify-no-reflection.sh 2.0.0
+        run: ./scripts/verify-no-reflection.sh "${{ steps.version.outputs.version }}"
+
+      # demo/gradle/libs.versions.toml pins a `roomql` version so the demo also works
+      # as a normal, non-CI Gradle checkout; CI overrides it here to whatever was just
+      # published above, so the two never need to be kept in step by hand.
+      - name: Point the demo at the version just published
+        run: |
+          sed -i "s/^roomql = .*/roomql = \"${{ steps.version.outputs.version }}\"/" demo/gradle/libs.versions.toml
 
       - name: Build demo app
         run: ./gradlew -p demo assembleDebug
