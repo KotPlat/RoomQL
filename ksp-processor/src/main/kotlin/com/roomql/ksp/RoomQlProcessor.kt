@@ -115,8 +115,7 @@ internal class RoomQlProcessor(private val environment: SymbolProcessorEnvironme
             return
         }
 
-        // Room's @ColumnInfo doesn't target constructor parameters, so Kotlin attaches it to
-        // the backing property instead of the KSValueParameter — look the property up by name.
+        // @ColumnInfo can't target a constructor parameter, so Kotlin puts it on the backing property.
         val propertiesByName = classDecl.getAllProperties().associateBy { it.simpleName.asString() }
         val fields = params.map { param ->
             val property = propertiesByName[param.name?.asString()]
@@ -161,14 +160,15 @@ internal class RoomQlProcessor(private val environment: SymbolProcessorEnvironme
         return if (explicit.isNullOrEmpty()) classDecl.simpleName.asString() else explicit
     }
 
-    private fun extractColumnName(prop: KSPropertyDeclaration): String {
-        val explicit = findAnnotationArg(prop.annotations, COLUMN_INFO_ANNOTATION, "name")
-        return if (explicit.isNullOrEmpty()) prop.simpleName.asString() else explicit
-    }
+    private fun extractColumnName(prop: KSPropertyDeclaration): String =
+        columnNameOrDefault(prop.annotations, prop.simpleName.asString())
 
-    private fun extractColumnName(param: KSValueParameter): String {
-        val explicit = findAnnotationArg(param.annotations, COLUMN_INFO_ANNOTATION, "name")
-        return if (explicit.isNullOrEmpty()) param.name!!.asString() else explicit
+    private fun extractColumnName(param: KSValueParameter): String =
+        columnNameOrDefault(param.annotations, param.name!!.asString())
+
+    private fun columnNameOrDefault(annotations: Sequence<KSAnnotation>, default: String): String {
+        val explicit = findAnnotationArg(annotations, COLUMN_INFO_ANNOTATION, "name")
+        return if (explicit.isNullOrEmpty()) default else explicit
     }
 
     private fun findAnnotationArg(

@@ -11,8 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # fetch-depth: 0 so the tag lookup below can see the tag history — the default
-      # shallow checkout has none.
+      # Full history so the release-tag lookup below sees tags; the default shallow checkout has none.
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
@@ -41,18 +40,11 @@ jobs:
       - name: Check public API surface
         run: ./gradlew apiCheck
 
-      # Derived from the latest reachable tag rather than hardcoded, so this workflow
-      # never needs a manual edit to track a version bump — release.yml already does
-      # the equivalent from the pushed tag itself; this is the same idea for a plain
-      # branch build that has no tag of its own to publish under.
+      # Latest release tag rather than a hardcoded version, so a version bump needs no edit here.
       - name: Resolve a version to publish and verify against
         id: version
         run: |
-          # `git describe` breaks ties unpredictably when tags share a commit (as
-          # 0.1.0 and 1.0.0 both do here), and the repo also carries non-version
-          # tags (e.g. backup-*) that a naive `--sort=-v:refname | head -1` would
-          # let outrank a real release. Filter to strict X.Y.Z tags first.
-          VERSION="$(git tag --list --sort=-v:refname | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | head -n1)"
+          VERSION="$(./scripts/latest-release-version.sh)"
           if [ -z "$VERSION" ]; then
             echo "::error::No X.Y.Z release tag found in history" >&2
             exit 1
@@ -74,9 +66,7 @@ jobs:
       - name: Verify no reflection in published artifacts
         run: ./scripts/verify-no-reflection.sh "${{ steps.version.outputs.version }}"
 
-      # demo/gradle/libs.versions.toml pins a `roomql` version so the demo also works
-      # as a normal, non-CI Gradle checkout; CI overrides it here to whatever was just
-      # published above, so the two never need to be kept in step by hand.
+      # The demo's pinned `roomql` version keeps a plain checkout working; CI swaps in the version just published.
       - name: Point the demo at the version just published
         run: |
           sed -i "s/^roomql = .*/roomql = \"${{ steps.version.outputs.version }}\"/" demo/gradle/libs.versions.toml

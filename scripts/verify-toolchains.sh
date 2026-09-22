@@ -23,9 +23,9 @@ echo "Publishing this checkout as $VERSION to Maven local..."
 failed=0
 results=()
 for toolchain in "${TOOLCHAINS[@]}"; do
-    read -r kotlin ksp room ksp2 <<< "$toolchain"
-    label="Kotlin $kotlin, KSP $ksp ($([[ $ksp2 == true ]] && echo KSP2 || echo KSP1)), Room $room"
-    dir="$WORK/demo-$kotlin-$ksp2"
+    read -r kotlin ksp room useKsp2 <<< "$toolchain"
+    label="Kotlin $kotlin, KSP $ksp ($([[ $useKsp2 == true ]] && echo KSP2 || echo KSP1)), Room $room"
+    dir="$WORK/demo-$kotlin-$useKsp2"
 
     rsync -a --exclude build --exclude .gradle "$ROOT/demo/" "$dir/"
     # -i.bak works on both GNU and BSD sed.
@@ -35,7 +35,7 @@ for toolchain in "${TOOLCHAINS[@]}"; do
         -e "s/^room = .*/room = \"$room\"/" \
         -e "s/^roomql = .*/roomql = \"$VERSION\"/" \
         "$dir/gradle/libs.versions.toml"
-    echo "ksp.useKSP2=$ksp2" >> "$dir/gradle.properties"
+    echo "ksp.useKSP2=$useKsp2" >> "$dir/gradle.properties"
 
     echo "Building demo on $label..."
     if "$dir/gradlew" -p "$dir" assembleDebug testDebugUnitTest --console=plain > "$dir/build.log" 2>&1; then
