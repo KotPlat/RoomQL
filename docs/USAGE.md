@@ -19,14 +19,15 @@ Every example shows the **Kotlin** you write and the **SQL** RoomQL generates, s
 7. [Operator reference: every condition RoomQL generates](#operator-reference-every-condition-roomql-generates)
 8. [Sorting and paginating with ORDER BY, LIMIT, and OFFSET](#sorting-and-paginating-with-order-by-limit-and-offset)
 9. [Grouping rows with GROUP BY and HAVING](#grouping-rows-with-group-by-and-having)
-10. [Joining tables with INNER JOIN and LEFT JOIN](#joining-tables-with-inner-join-and-left-join)
-11. [Returning suspend and Flow results](#returning-suspend-and-flow-results)
-12. [Converting a RoomQlQuery with .toQuery()](#converting-a-roomqlquery-with-toquery)
-13. [Error handling: what build() rejects and why](#error-handling-what-build-rejects-and-why)
-14. [A complete repository](#a-complete-repository)
-15. [Testing generated SQL without a device](#testing-generated-sql-without-a-device)
-16. [Runnable examples](#runnable-examples)
-17. [Troubleshooting](#troubleshooting)
+10. [Selecting specific columns and aggregates with select](#selecting-specific-columns-and-aggregates-with-select)
+11. [Joining tables with INNER JOIN and LEFT JOIN](#joining-tables-with-inner-join-and-left-join)
+12. [Returning suspend and Flow results](#returning-suspend-and-flow-results)
+13. [Converting a RoomQlQuery with .toQuery()](#converting-a-roomqlquery-with-toquery)
+14. [Error handling: what build() rejects and why](#error-handling-what-build-rejects-and-why)
+15. [A complete repository](#a-complete-repository)
+16. [Testing generated SQL without a device](#testing-generated-sql-without-a-device)
+17. [Runnable examples](#runnable-examples)
+18. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -403,7 +404,56 @@ query {
 SELECT * FROM orders GROUP BY userId, status
 ```
 
-`having { }` and `orderBy(...)` accept aggregate expressions like `count(...)` and `sum(...)` (see [API.md](API.md)), but RoomQL still selects whole rows, so an aggregate value has no projection column of its own yet. `groupBy(...)` itself stays `Column<T>`-only: `GROUP BY COUNT(x)` is meaningless SQL.
+`having { }` and `orderBy(...)` accept aggregate expressions like `count(...)` and `sum(...)` (see [API.md](API.md)). Project an aggregate's value into the result with `select(...)` — see [Selecting specific columns and aggregates](#selecting-specific-columns-and-aggregates-with-select) below. `groupBy(...)` itself stays `Column<T>`-only: `GROUP BY COUNT(x)` is meaningless SQL.
+
+---
+
+## Selecting specific columns and aggregates with select
+
+Left out, `build()` behaves exactly as v1: `SELECT *`, with `JOIN`-collision columns aliased automatically. `select(...)` replaces that with an explicit, typed projection:
+
+```kotlin
+query {
+    from(ProductEntityTable)
+    where { ProductEntityTable.category eq "electronics" }
+    select(countAll())
+}
+```
+
+```sql
+SELECT COUNT(*) FROM products WHERE category = ?
+-- args: ["electronics"]
+```
+
+A single unaliased expression needs no name at all — Room binds it straight to a scalar return type (`Int`, `Long`, `Double`, …) exactly like any other query:
+
+```kotlin
+@RawQuery fun countByCategory(q: SupportSQLiteQuery): Int
+```
+
+A multi-column projection names each output with the `alias` infix — the escape hatch for custom result classes until a `@RoomQlProjection` descriptor can generate the names for you:
+
+```kotlin
+query {
+    from(OrderEntityTable)
+    groupBy(OrderEntityTable.customerId)
+    select(
+        OrderEntityTable.customerId,
+        count(OrderEntityTable.id) alias "order_count",
+    )
+}
+```
+
+```sql
+SELECT customerId, COUNT(id) AS order_count FROM orders GROUP BY customerId
+```
+
+`build()` rejects two shapes that would otherwise let SQLite pick an arbitrary row's value silently:
+
+- A **grouped** query (`groupBy(...)` set) whose projection has a bare column missing from `GROUP BY`.
+- An **ungrouped** query mixing an aggregate with a bare column — the same hole, without an explicit `GROUP BY` to name.
+
+An ungrouped, aggregate-free multi-column projection (`select(a, b)`) is just an ordinary `SELECT a, b` and passes through uncaught.
 
 ---
 
@@ -535,6 +585,8 @@ Every case that throws `RoomQlException`:
 | `offset()` without `limit()` | `offset() requires limit() to be set` |
 | `having { }` without `groupBy()` | `having() requires groupBy() to be set` |
 | `join()` after a raw-string `from(String)` | `join() requires from(EntityTable) so columns can be aliased; from(String) has no column metadata` |
+| `select(...)` with a grouped bare column missing from `groupBy()` | `select { } column(s) not in groupBy(): <names>` |
+| `select(...)` mixing an aggregate with a bare column, ungrouped | `select { } cannot mix an aggregate with a bare column unless groupBy() is set` |
 
 These are programming errors rather than user input errors, so they are unchecked by design: a query that is wrong is wrong on every run, and will fail the first time the code path executes.
 

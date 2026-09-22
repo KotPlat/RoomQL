@@ -79,6 +79,10 @@ public final class com/roomql/runtime/JoinType : java/lang/Enum {
 	public static fun values ()[Lcom/roomql/runtime/JoinType;
 }
 
+public final class com/roomql/runtime/ProjectionKt {
+	public static final fun alias (Lcom/roomql/runtime/Expression;Ljava/lang/String;)Lcom/roomql/runtime/Expression;
+}
+
 public final class com/roomql/runtime/QueryBuilder {
 	public fun <init> ()V
 	public final fun build ()Lcom/roomql/runtime/RoomQlQuery;
@@ -90,6 +94,7 @@ public final class com/roomql/runtime/QueryBuilder {
 	public final fun limit (I)V
 	public final fun offset (I)V
 	public final fun orderBy (Lcom/roomql/runtime/Expression;Lcom/roomql/runtime/SortDirection;)V
+	public final fun select ([Lcom/roomql/runtime/Expression;)V
 	public final fun where (Lkotlin/jvm/functions/Function1;)V
 }
 

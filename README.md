@@ -123,7 +123,8 @@ No `if` ladders, no `IS NULL OR` trick, and `UserEntityTable.age` is a real Kotl
 
 - **Compile-time safety on column references.** `UserEntityTable.age` is generated from your entity by KSP. Renames and typos fail the build instead of the query.
 - **Optional filters that disappear, and say so.** `age gteIfNotNull minAge` drops the condition from the SQL when `minAge` is null; the plain `age gte minAge` is required and will not compile with a nullable value. Reading the operator name tells you which one you have.
-- **A real DSL, not string concatenation.** `where`, `or { }`, `orderBy`, `limit`/`offset`, `groupBy`/`having`, `join`. Values are bound as positional `?` parameters, so there is no injection surface.
+- **A real DSL, not string concatenation.** `where`, `or { }`, `orderBy`, `limit`/`offset`, `groupBy`/`having`, `select`, `join`. Values are bound as positional `?` parameters, so there is no injection surface.
+- **Aggregates and explicit projections.** `count`, `countAll`, `sum`, `avg`, `min`, `max` work in `having { }` and `orderBy`; `select(...)` projects them (or specific columns) instead of whole rows.
 - **Automatic JOIN column aliasing.** Colliding column names across joined tables are aliased (`users.id AS users__id`) so a cursor never silently overwrites one column with another.
 - **Works with Room's own `@RawQuery`.** The output is a plain `SupportSQLiteQuery`. Blocking, `suspend`, and `Flow` return types all work — Room does the rest.
 
@@ -147,7 +148,7 @@ RoomQL's entire public surface, across all three artifacts. Signatures, generic 
 | Symbol | Artifact | What it does |
 |---|---|---|
 | [`query { }`](docs/API.md#query) | runtime | Entry point. Builds and returns a `RoomQlQuery`. |
-| [`QueryBuilder`](docs/API.md#querybuilder) | runtime | Receiver inside `query { }`: `from`, `join`, `where`, `groupBy`, `having`, `orderBy`, `limit`, `offset`, `build`. |
+| [`QueryBuilder`](docs/API.md#querybuilder) | runtime | Receiver inside `query { }`: `from`, `join`, `where`, `groupBy`, `having`, `select`, `orderBy`, `limit`, `offset`, `build`. |
 | [`WhereScope`, `HavingScope`](docs/API.md#wherescope-and-havingscope-the-condition-operators) | runtime | Receivers inside `where { }` (`Column<T>`-only) and `having { }` (any `Expression<T>`, aggregates included). Both carry every operator below, plus `or { }` for alternatives. |
 | `eq`, `notEq`, `gt`, `gte`, `lt`, `lte` | runtime | Comparisons. Required — a nullable value will not compile. |
 | `eqIfNotNull`, `notEqIfNotNull`, `gtIfNotNull`, `gteIfNotNull`, `ltIfNotNull`, `lteIfNotNull` | runtime | The optional forms. Skip when the value is `null`. |
@@ -158,7 +159,9 @@ RoomQL's entire public surface, across all three artifacts. Signatures, generic 
 | `between` | runtime | Range. Both bounds required — compose `gteIfNotNull` + `lteIfNotNull` for a half-open range. |
 | `isNull`, `isNotNull` | runtime | SQL `NULL` checks — the two operators that never skip. |
 | [`Column<T>`](docs/API.md#column) | runtime | A typed column reference. Generated per entity property, never hand-written. |
-| [`count`, `countAll`, `sum`, `avg`, `min`, `max`](docs/API.md#aggregate-functions) | runtime | `Expression<T>` factories for `having { }` and `orderBy`. `count`/`countAll` differ under a `LEFT JOIN`; `sum`/`avg` require a numeric column. |
+| [`count`, `countAll`, `sum`, `avg`, `min`, `max`](docs/API.md#aggregate-functions) | runtime | `Expression<T>` factories for `having { }`, `orderBy`, and `select`. `count`/`countAll` differ under a `LEFT JOIN`; `sum`/`avg` require a numeric column. |
+| [`select`](docs/API.md#projections) | runtime | Projects specific columns/aggregates instead of whole rows. Switches off automatic JOIN-collision aliasing when present. |
+| [`alias`](docs/API.md#projections) | runtime | Names an expression's output column for a multi-column `select(...)` with no `@RoomQlProjection` descriptor. |
 | [`EntityTable`](docs/API.md#entitytable) | runtime | Implemented by every generated `*Table`: `tableName`, `allColumnNames`. |
 | [`RoomQlQuery`](docs/API.md#roomqlquery) | runtime | The DSL's output: `sql` plus positional `args`. Pure JVM — assert on it in unit tests. |
 | [`JoinType`](docs/API.md#jointype-and-sortdirection) / [`SortDirection`](docs/API.md#jointype-and-sortdirection) | runtime | `INNER`/`LEFT`, and `ASC`/`DESC`. |
@@ -177,7 +180,7 @@ RoomQL's entire public surface, across all three artifacts. Signatures, generic 
 | `SupportSQLiteQueryBuilder` (androidx.sqlite) | No — columns are strings | Manual | Already on your classpath; no type safety, no Room integration |
 | [SQLDelight](https://github.com/sqldelight/sqldelight) | Yes — full SQL verified at compile time | Limited; dynamic shapes need generated variants or raw execution | You leave Room entirely and own the schema in `.sq` files |
 
-**Use RoomQL when** you are staying on Room and have search-style queries whose filters are decided at runtime. **Do not use RoomQL when** your queries are static — a plain `@Query` gives you full compile-time SQL verification, which RoomQL cannot, because `@RawQuery` skips it by design. It is also the wrong tool if you need a query shape RoomQL does not build: column projections, `DISTINCT`, aggregate expressions, multi-column `GROUP BY`, subqueries, or `UNION`. RoomQL selects whole rows.
+**Use RoomQL when** you are staying on Room and have search-style queries whose filters are decided at runtime. **Do not use RoomQL when** your queries are static — a plain `@Query` gives you full compile-time SQL verification, which RoomQL cannot, because `@RawQuery` skips it by design. It is also the wrong tool if you need a query shape RoomQL does not build: `DISTINCT`, subqueries, or `UNION`.
 
 ## FAQ
 
@@ -229,7 +232,8 @@ Know these before adopting:
 - **Positional `?` args only.** No named parameters — a Room `@RawQuery` restriction.
 - **`QueryBuilder` is not thread-safe.** Build a query on one thread or coroutine; never share a half-built builder.
 - **Validation is deferred to `build()`.** Missing `from()`, a non-positive `limit`, `offset` without `limit`, and `having` without `groupBy` all throw `RoomQlException` at build time, not while you configure.
-- **Whole-row selects only.** No projections, `DISTINCT`, aggregate expressions, multi-column `GROUP BY`, subqueries, or `UNION`.
+- **No `DISTINCT`, subqueries, or `UNION`.** `select(...)` covers explicit projections and aggregates; these three remain out of scope.
+- **No auto-generated projection result classes yet.** A multi-column `select(...)` names its columns with the `alias` infix; a KSP-generated `@RoomQlProjection` descriptor that infers the names from a data class is tracked separately.
 - **Room version range.** Targets Room 2.6.x–2.7.x (API 21+). Room 2.8 raised `minSdk` to 23; support is deferred.
 - **No auto-generated JOIN result types.** You supply your own result class — by design, so you control its shape.
 

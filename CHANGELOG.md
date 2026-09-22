@@ -14,6 +14,13 @@ All notable changes to **RoomQL** are documented here. The format follows
 - **`groupBy()` is additive**: repeated calls now append instead of overwriting, so
   `GROUP BY a, b` is expressible as `groupBy(a); groupBy(b)`, matching `orderBy`'s existing
   precedent. See #75.
+- **`select(vararg expressions: Expression<*>)`**: projects specific columns and aggregates
+  instead of whole rows, switching off v1's automatic JOIN-collision aliasing when present. A
+  single unaliased expression needs no name — Room binds it straight to a scalar return type.
+  The `alias` infix names a column for the multi-column case, ahead of a KSP-generated
+  `@RoomQlProjection` descriptor. `build()` rejects a grouped projection with a bare column
+  missing from `groupBy()`, and an ungrouped projection mixing an aggregate with a bare
+  column. See #73.
 
 ### Changed — breaking
 

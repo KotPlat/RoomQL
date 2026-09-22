@@ -15,6 +15,7 @@ The public surface is deliberately small and is frozen by [Binary Compatibility 
   - [JoinScope and JoinConditionScope](#joinscope-and-joinconditionscope)
   - [Column](#column)
   - [Aggregate functions](#aggregate-functions)
+  - [Projections](#projections)
   - [EntityTable](#entitytable)
   - [RoomQlQuery](#roomqlquery)
   - [JoinType and SortDirection](#jointype-and-sortdirection)
@@ -56,6 +57,7 @@ The receiver inside `query { }`. Marked `@RoomQlDsl`, so outer-scope members can
 | `where` | `where(block: WhereScope.() -> Unit)` | Opens a `WhereScope`. Repeated calls merge into one AND-combined set. |
 | `groupBy` | `groupBy(column: Column<*>)` | Adds a column to `GROUP BY`. Call repeatedly for a multi-column `GROUP BY`. |
 | `having` | `having(block: HavingScope.() -> Unit)` | Opens a `HavingScope` for `HAVING`. Requires `groupBy`. |
+| `select` | `select(vararg expressions: Expression<*>)` | Projects specific columns/aggregates instead of whole rows. See [Projections](#projections). |
 | `orderBy` | `orderBy(expression: Expression<*>, direction: SortDirection)` | Appends a sort key. Call repeatedly for a multi-column `ORDER BY`. |
 | `limit` | `limit(n: Int)` | Sets `LIMIT`. Must be positive. |
 | `offset` | `offset(n: Int)` | Sets `OFFSET`. Requires `limit`. |
@@ -165,6 +167,40 @@ query {
 ```
 
 `count` and `countAll` are deliberately separate: under a `LEFT JOIN`, `COUNT(column)` yields 0 for an unmatched row, while `COUNT(*)` yields 1. `sum` and `avg` are constrained to numeric column types; `avg` always returns `Double?` regardless of the input numeric type, matching SQL's own `AVG`. All six aggregate results are nullable, since SQL returns `NULL` for an empty group.
+
+### Projections
+
+```kotlin
+public fun QueryBuilder.select(vararg expressions: Expression<*>)
+public infix fun <T> Expression<T>.alias(name: String): Expression<T>
+```
+
+`select(...)` projects specific columns and aggregates instead of whole rows. Left out entirely, `build()` behaves exactly as v1: `SELECT *`, with `JOIN`-collision columns aliased automatically. Present, that automatic aliasing switches off — `select(...)`'s argument list is the complete, explicit set of columns returned:
+
+```kotlin
+val q = query {
+    from(ProductTable)
+    where { ProductTable.category eq "electronics" }
+    select(countAll())
+}
+// SELECT COUNT(*) FROM products WHERE category = ?
+```
+
+A single unaliased expression needs no name — Room binds it straight to a scalar return type (`Int`, `Long`, …), exactly like any other query. `alias` names an expression's output column, for a multi-column projection with no `@RoomQlProjection` descriptor:
+
+```kotlin
+select(
+    CategoryTable.id alias "category_id",
+    count(ProductTable.id) alias "product_count",
+)
+// SELECT id AS category_id, COUNT(id) AS product_count FROM ...
+```
+
+**Validated at `build()`**, via the same `roomQlCheck` mechanism as every other check on this page — not a type-state DSL:
+
+- A **grouped** query (`groupBy(...)` set) whose projection has a bare column absent from `GROUP BY` throws — SQLite would otherwise pick an arbitrary row's value for it.
+- An **ungrouped** query mixing an aggregate with a bare column throws for the same reason, without an explicit `GROUP BY` to name.
+- An ungrouped, aggregate-free multi-column projection (`select(a, b)`) passes through uncaught — an ordinary `SELECT a, b`, nothing unsafe about it.
 
 ### EntityTable
 

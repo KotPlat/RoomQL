@@ -11,6 +11,7 @@ public class QueryBuilder {
     private var offsetValue: Int? = null
     private val groupByColumns = mutableListOf<Column<*>>()
     private var havingScope: HavingScope? = null
+    private val selectExpressions = mutableListOf<Expression<*>>()
 
     public fun from(tableName: String) {
         fromTable = tableName
@@ -52,6 +53,10 @@ public class QueryBuilder {
         scope.apply(block)
     }
 
+    public fun select(vararg expressions: Expression<*>) {
+        selectExpressions.addAll(expressions)
+    }
+
     public fun build(): RoomQlQuery {
         val table = fromTable ?: throw RoomQlException("from() must be called before build()")
         val limit = limitValue
@@ -63,11 +68,15 @@ public class QueryBuilder {
         roomQlCheck(joins.isEmpty() || entityTable != null) {
             "join() requires from(EntityTable) so columns can be aliased; from(String) has no column metadata"
         }
+        checkSelectProjection()
 
         val collidingNames = collidingColumnNames()
         val args = mutableListOf<Any?>()
         val sql = buildString {
-            if (joins.isNotEmpty() && entityTable != null) {
+            if (selectExpressions.isNotEmpty()) {
+                append("SELECT ")
+                append(selectExpressions.joinToString(", ") { it.render(collidingNames) })
+            } else if (joins.isNotEmpty() && entityTable != null) {
                 appendSelectWithAliasing(entityTable, joins, collidingNames)
             } else {
                 append("SELECT *")
@@ -110,6 +119,24 @@ public class QueryBuilder {
         return RoomQlQuery(sql, args)
     }
 
+    /** Rejects a select { } that would let SQLite pick an arbitrary row's value silently. */
+    private fun checkSelectProjection() {
+        if (selectExpressions.isEmpty()) return
+        val unwrapped = selectExpressions.map { if (it is AliasedExpression<*>) it.expression else it }
+        val bareColumns = unwrapped.filterIsInstance<Column<*>>()
+        val hasAggregate = unwrapped.any { it is AggregateExpression<*> }
+        if (groupByColumns.isNotEmpty()) {
+            val ungrouped = bareColumns.filter { it !in groupByColumns }
+            roomQlCheck(ungrouped.isEmpty()) {
+                "select { } column(s) not in groupBy(): ${ungrouped.joinToString { it.columnName }}"
+            }
+        } else {
+            roomQlCheck(!(hasAggregate && bareColumns.isNotEmpty())) {
+                "select { } cannot mix an aggregate with a bare column unless groupBy() is set"
+            }
+        }
+    }
+
     /** Column names shared by more than one table in this query's FROM + JOINs. Empty when there are no joins. */
     private fun collidingColumnNames(): Set<String> {
         val primary = fromEntityTable ?: return emptySet()
@@ -130,6 +157,7 @@ private const val SQL_OR = " OR "
 private fun Expression<*>.render(collidingNames: Set<String>): String = when (this) {
     is Column<*> -> if (columnName in collidingNames) "$tableName.$columnName" else columnName
     is AggregateExpression<*> -> "$sqlFunction(${operand?.render(collidingNames) ?: "*"})"
+    is AliasedExpression<*> -> "${expression.render(collidingNames)} AS $alias"
 }
 
 private fun renderCondition(condition: Condition, args: MutableList<Any?>, sb: StringBuilder, collidingNames: Set<String>) {
