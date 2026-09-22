@@ -9,7 +9,7 @@ public class QueryBuilder {
     private val orderByClauses = mutableListOf<Pair<Expression<*>, SortDirection>>()
     private var limitValue: Int? = null
     private var offsetValue: Int? = null
-    private var groupByColumn: Column<*>? = null
+    private val groupByColumns = mutableListOf<Column<*>>()
     private var havingScope: HavingScope? = null
 
     public fun from(tableName: String) {
@@ -44,7 +44,7 @@ public class QueryBuilder {
     }
 
     public fun groupBy(column: Column<*>) {
-        groupByColumn = column
+        groupByColumns.add(column)
     }
 
     public fun having(block: HavingScope.() -> Unit) {
@@ -56,11 +56,10 @@ public class QueryBuilder {
         val table = fromTable ?: throw RoomQlException("from() must be called before build()")
         val limit = limitValue
         val entityTable = fromEntityTable
-        val groupByCol = groupByColumn
 
         roomQlCheck(limit == null || limit > 0) { "limit() must be a positive integer, got $limit" }
         roomQlCheck(offsetValue == null || limit != null) { "offset() requires limit() to be set" }
-        roomQlCheck(havingScope == null || groupByCol != null) { "having() requires groupBy() to be set" }
+        roomQlCheck(havingScope == null || groupByColumns.isNotEmpty()) { "having() requires groupBy() to be set" }
         roomQlCheck(joins.isEmpty() || entityTable != null) {
             "join() requires from(EntityTable) so columns can be aliased; from(String) has no column metadata"
         }
@@ -89,8 +88,9 @@ public class QueryBuilder {
                 renderCondition(whereCondition, args, this, collidingNames)
             }
 
-            if (groupByCol != null) {
-                append(" GROUP BY ${groupByCol.render(collidingNames)}")
+            if (groupByColumns.isNotEmpty()) {
+                append(" GROUP BY ")
+                append(groupByColumns.joinToString(", ") { it.render(collidingNames) })
                 val havingCondition = havingScope?.build() ?: Condition.Empty
                 if (havingCondition !is Condition.Empty) {
                     append(" HAVING ")

@@ -11,6 +11,7 @@ All notable changes to **RoomQL** are documented here. The format follows
 - **Aggregate functions**: `count`, `countAll`, `sum`, `avg`, `min`, `max` as `Expression<T>`
   factories, usable in `having { }` and `orderBy`. `count`/`countAll` are kept separate because
   they differ under a `LEFT JOIN`; `sum`/`avg` are constrained to numeric columns. See #72.
+
 - **Maven Central publishing.** All three artifacts publish under a new groupId,
   `io.github.kotplat.roomql`, with `roomql-` prefixes dropped from the artifactIds
   (`roomql-runtime` → `runtime`, `roomql-runtime-android` → `runtime-android`,

@@ -54,7 +54,7 @@ The receiver inside `query { }`. Marked `@RoomQlDsl`, so outer-scope members can
 | `from` | `from(tableName: String)` | Sets the primary table by raw name. Carries no column metadata, so it cannot be joined. |
 | `join` | `join(table: EntityTable, type: JoinType, block: JoinScope.() -> Unit)` | Adds a JOIN with an `ON` predicate. Call repeatedly to join more than two tables. |
 | `where` | `where(block: WhereScope.() -> Unit)` | Opens a `WhereScope`. Repeated calls merge into one AND-combined set. |
-| `groupBy` | `groupBy(column: Column<*>)` | Groups by one column. Last call wins. |
+| `groupBy` | `groupBy(column: Column<*>)` | Adds a column to `GROUP BY`. Call repeatedly for a multi-column `GROUP BY`. |
 | `having` | `having(block: HavingScope.() -> Unit)` | Opens a `HavingScope` for `HAVING`. Requires `groupBy`. |
 | `orderBy` | `orderBy(expression: Expression<*>, direction: SortDirection)` | Appends a sort key. Call repeatedly for a multi-column `ORDER BY`. |
 | `limit` | `limit(n: Int)` | Sets `LIMIT`. Must be positive. |
