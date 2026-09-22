@@ -389,7 +389,21 @@ SELECT * FROM orders GROUP BY userId HAVING total > ?
 -- args: [100.0]
 ```
 
-`having { }` accepts exactly the same operators as `where { }` — required and `IfNotNull` forms both — and requires `groupBy(...)` to be set or `build()` throws. RoomQL groups by a **single** column and selects whole rows: there are no aggregate expressions (`COUNT`, `SUM`) and no multi-column `GROUP BY`. For those, a static Room `@Query` remains the right tool.
+`having { }` accepts exactly the same operators as `where { }` — required and `IfNotNull` forms both — and requires `groupBy(...)` to be set or `build()` throws. Call `groupBy(...)` repeatedly for a multi-column `GROUP BY`:
+
+```kotlin
+query {
+    from(OrderEntityTable)
+    groupBy(OrderEntityTable.userId)
+    groupBy(OrderEntityTable.status)
+}
+```
+
+```sql
+SELECT * FROM orders GROUP BY userId, status
+```
+
+`having { }` and `orderBy(...)` accept aggregate expressions like `count(...)` and `sum(...)` (see [API.md](API.md)), but RoomQL still selects whole rows, so an aggregate value has no projection column of its own yet. `groupBy(...)` itself stays `Column<T>`-only: `GROUP BY COUNT(x)` is meaningless SQL.
 
 ---
 
