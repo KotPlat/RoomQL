@@ -69,7 +69,7 @@ Add `io.github.kotplat.roomql:runtime` directly only if you want the DSL without
 |---|---|
 | Kotlin | 2.0.21 or newer (tested on 2.0.21, 2.1.21, and 2.2.0) |
 | KSP | The version matching your Kotlin. KSP1 and KSP2 both work. |
-| Room | 2.6.x – 2.7.x (KSP2 needs Room 2.7+) |
+| Room | 2.6.x – 2.7.x (tested on 2.6.1 and 2.7.2; KSP2 needs Room 2.7+) |
 | Android | minSdk 21+ |
 | JDK (to run the build) | 17 or newer |
 | App Java target | Any on Android. Pure-JVM use of `runtime` needs Java 17+. |
@@ -262,7 +262,7 @@ Know these before adopting:
 - **Validation is deferred to `build()`.** Missing `from()`, a non-positive `limit`, `offset` without `limit`, and `having` without `groupBy` all throw `RoomQlException` at build time, not while you configure.
 - **No `DISTINCT`, subqueries, or `UNION`.** `select(...)` covers explicit projections and aggregates; these three remain out of scope.
 - **`@Projection`-generated factories only cover the constructor-property shape.** A result class outside that shape (a computed property, a shape KSP can't infer) still names its columns with the plain `alias` infix instead.
-- **Room version range.** Targets Room 2.6.x–2.7.x (API 21+). Room 2.8 raised `minSdk` to 23; support is deferred.
+- **Room version range.** Targets Room 2.6.x–2.7.x (API 21+): CI tests 2.6.1, and `scripts/verify-toolchains.sh` tests 2.7.2 before each release. Room 2.8 raised `minSdk` to 23; support is deferred.
 - **No auto-generated JOIN result types.** You supply your own result class — by design, so you control its shape.
 
 ## Modules
