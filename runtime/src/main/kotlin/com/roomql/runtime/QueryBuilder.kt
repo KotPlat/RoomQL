@@ -14,7 +14,7 @@ public class QueryBuilder {
     private var havingScope: HavingScope? = null
     private val selectItems = mutableListOf<SelectItem<*>>()
 
-    /** Sets the primary table by raw name; carries no column metadata, so [build] rejects a [join] after it. Trusted names only. */
+    /** Sets the primary table by name, quoted like every identifier; carries no column metadata, so [build] rejects a [join] after it. */
     public fun from(tableName: String) {
         fromTable = tableName
     }
@@ -42,7 +42,7 @@ public class QueryBuilder {
         orderByClauses.add(expression to direction)
     }
 
-    /** Sets `LIMIT`. Repeated calls overwrite the previous value. [build] throws unless [n] is positive. */
+    /** Sets `LIMIT`; `0` returns no rows. Repeated calls overwrite the previous value. [build] throws if [n] is negative. */
     public fun limit(n: Int) {
         limitValue = n
     }
@@ -74,12 +74,13 @@ public class QueryBuilder {
         val limit = limitValue
         val entityTable = fromEntityTable
 
-        roomQlCheck(limit == null || limit > 0) { "limit() must be a positive integer, got $limit" }
+        roomQlCheck(limit == null || limit >= 0) { "limit() must not be negative, got $limit" }
         roomQlCheck(offsetValue == null || limit != null) { "offset() requires limit() to be set" }
         roomQlCheck(havingScope == null || groupByColumns.isNotEmpty()) { "having() requires groupBy() to be set" }
         roomQlCheck(joins.isEmpty() || entityTable != null) {
             "join() requires from(EntityTable) so columns can be aliased; from(String) has no column metadata"
         }
+        if (entityTable != null) checkTables(entityTable)
         val collidingNames = collidingColumnNames()
         checkSelectProjection(collidingNames)
 
@@ -93,10 +94,10 @@ public class QueryBuilder {
             } else {
                 append("SELECT *")
             }
-            append(" FROM $table")
+            append(" FROM ${quote(table)}")
 
             for (join in joins) {
-                append(" ${join.type.keyword} JOIN ${join.table.tableName}")
+                append(" ${join.type.keyword} JOIN ${quote(join.table.tableName)}")
                 if (join.onCondition !is Condition.Empty) {
                     append(" ON ")
                     renderCondition(join.onCondition, args, this, collidingNames)
@@ -128,7 +129,31 @@ public class QueryBuilder {
             offsetValue?.let { append(" OFFSET $it") }
         }
 
+        roomQlCheck(args.size <= MAX_BIND_ARGS) {
+            "query binds ${args.size} values, but SQLite on Android API 30 and below allows at most $MAX_BIND_ARGS. " +
+                "Integer inList() values are inlined and don't count; split other large lists across queries"
+        }
         return RoomQlQuery(sql, args)
+    }
+
+    /** Rejects a self-join, which needs table aliases RoomQL doesn't have, and any column from a table outside from/join. */
+    private fun checkTables(primary: EntityTable) {
+        val tableNames = listOf(primary.tableName) + joins.map { it.table.tableName }
+        val repeated = tableNames.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
+        roomQlCheck(repeated.isEmpty()) {
+            "table ${repeated.joinToString()} appears more than once in from()/join(); self-joins aren't supported yet"
+        }
+
+        val referenced = selectItems.flatMap { it.parts().first.columns() } +
+            joins.flatMap { it.onCondition.columns() } +
+            (whereScope?.build()?.columns() ?: emptyList()) +
+            groupByColumns +
+            (havingScope?.build()?.columns() ?: emptyList()) +
+            orderByClauses.flatMap { it.first.columns() }
+        val foreign = referenced.filter { it.tableName !in tableNames }.distinct()
+        roomQlCheck(foreign.isEmpty()) {
+            "column(s) from a table not in from()/join(): ${foreign.joinToString { it.describe() }}"
+        }
     }
 
     /** Rejects a select(...) that would let Room or SQLite map the wrong value silently. */
@@ -145,6 +170,13 @@ public class QueryBuilder {
         } else {
             roomQlCheck(!(hasAggregate && bareColumns.isNotEmpty())) {
                 "select(...) cannot mix an aggregate with a bare column unless groupBy() is set"
+            }
+        }
+
+        if (selectItems.size > 1) {
+            val unnamed = selectItems.filterIsInstance<AggregateExpression<*>>().map { it.describe() }
+            roomQlCheck(unnamed.isEmpty()) {
+                "select(...) with more than one item needs an alias on each aggregate, or Room can't map it: ${unnamed.joinToString()}"
             }
         }
 
@@ -172,7 +204,7 @@ private const val SQL_OR = " OR "
 
 /** Qualifies a column with its table name only when the column name collides across the joined tables. */
 private fun Expression<*>.render(collidingNames: Set<String>): String = when (this) {
-    is Column<*> -> if (columnName in collidingNames) "$tableName.$columnName" else columnName
+    is Column<*> -> if (columnName in collidingNames) "${quote(tableName)}.${quote(columnName)}" else quote(columnName)
     is AggregateExpression<*> -> "$sqlFunction(${operand?.render(collidingNames) ?: "*"})"
 }
 
@@ -182,7 +214,25 @@ private fun SelectItem<*>.parts(): Pair<Expression<*>, String?> = when (this) {
     is AliasedExpression<*> -> expression to alias
 }
 
-// Quoted so a reserved word (`order`, `group`) still works as an alias; SQLite reports the name unquoted.
+// Room quotes identifiers too, so a reserved word (`order`, `group`) works as a name; SQLite reports it unquoted.
+private fun quote(identifier: String): String {
+    roomQlCheck('`' !in identifier) { "table and column names cannot contain a backtick: $identifier" }
+    return "`$identifier`"
+}
+
+private fun Expression<*>.columns(): List<Column<*>> = when (this) {
+    is Column<*> -> listOf(this)
+    is AggregateExpression<*> -> operand?.columns() ?: emptyList()
+}
+
+private fun Condition.columns(): List<Column<*>> = when (this) {
+    is Condition.Empty -> emptyList()
+    is Condition.Simple -> expression.columns()
+    is Condition.ColumnCompare -> listOf(left, right)
+    is Condition.And -> conditions.flatMap { it.columns() }
+    is Condition.Or -> conditions.flatMap { it.columns() }
+}
+
 private fun SelectItem<*>.renderSelectItem(collidingNames: Set<String>): String {
     val (expression, alias) = parts()
     val rendered = expression.render(collidingNames)
@@ -199,11 +249,11 @@ private fun renderCondition(condition: Condition, args: MutableList<Any?>, sb: S
     when (condition) {
         is Condition.Empty -> Unit
         is Condition.Simple -> {
-            args.addAll(condition.args)
+            condition.args.mapTo(args) { toBindable(it, condition.expression) }
             sb.append(condition.template.replace("%s", condition.expression.render(collidingNames)))
         }
         is Condition.ColumnCompare ->
-            sb.append("${condition.left.tableName}.${condition.left.columnName} = ${condition.right.tableName}.${condition.right.columnName}")
+            sb.append("${condition.left.qualified()} = ${condition.right.qualified()}")
         is Condition.And -> sb.appendConditions(condition.conditions, SQL_AND, args, collidingNames)
         is Condition.Or -> {
             sb.append('(')
@@ -212,6 +262,8 @@ private fun renderCondition(condition: Condition, args: MutableList<Any?>, sb: S
         }
     }
 }
+
+private fun Column<*>.qualified(): String = "${quote(tableName)}.${quote(columnName)}"
 
 private fun StringBuilder.appendConditions(
     conditions: List<Condition>,
@@ -241,9 +293,9 @@ private fun StringBuilder.appendSelectWithAliasing(primary: EntityTable, joins: 
             if (!first) append(", ")
             first = false
             if (col in collidingNames) {
-                append("${table.tableName}.$col AS ${table.tableName}__$col")
+                append("${quote(table.tableName)}.${quote(col)} AS ${quote("${table.tableName}__$col")}")
             } else {
-                append(col)
+                append(quote(col))
             }
         }
     }

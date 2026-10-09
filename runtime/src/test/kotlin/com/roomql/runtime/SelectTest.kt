@@ -9,7 +9,7 @@ class SelectTest {
     @Test
     fun `select absent renders SELECT star`() {
         val result = query { from("users") }
-        assertEquals("SELECT * FROM users", result.sql)
+        assertEquals("SELECT * FROM `users`", result.sql)
     }
 
     @Test
@@ -19,7 +19,7 @@ class SelectTest {
             where { Column<String>("category", "products") eq "electronics" }
             select(countAll())
         }
-        assertEquals("SELECT COUNT(*) FROM products WHERE category = ?", result.sql)
+        assertEquals("SELECT COUNT(*) FROM `products` WHERE `category` = ?", result.sql)
         assertEquals(listOf("electronics"), result.args.toList())
     }
 
@@ -29,7 +29,7 @@ class SelectTest {
             from("users")
             select(Column<String>("status", "users"))
         }
-        assertEquals("SELECT status FROM users", result.sql)
+        assertEquals("SELECT `status` FROM `users`", result.sql)
     }
 
     @Test
@@ -38,7 +38,7 @@ class SelectTest {
             from("users")
             select(Column<Int>("id", "users"), Column<String>("status", "users"))
         }
-        assertEquals("SELECT id, status FROM users", result.sql)
+        assertEquals("SELECT `id`, `status` FROM `users`", result.sql)
     }
 
     @Test
@@ -47,7 +47,7 @@ class SelectTest {
             from("categories")
             select(Column<Int>("id", "categories") alias "category_id")
         }
-        assertEquals("SELECT id AS `category_id` FROM categories", result.sql)
+        assertEquals("SELECT `id` AS `category_id` FROM `categories`", result.sql)
     }
 
     @Test
@@ -57,7 +57,7 @@ class SelectTest {
             groupBy(Column<String>("customer_id", "orders"))
             select(Column<String>("customer_id", "orders"), count(Column<Long>("id", "orders")) alias "order_count")
         }
-        assertEquals("SELECT customer_id, COUNT(id) AS `order_count` FROM orders GROUP BY customer_id", result.sql)
+        assertEquals("SELECT `customer_id`, COUNT(`id`) AS `order_count` FROM `orders` GROUP BY `customer_id`", result.sql)
     }
 
     @Test
@@ -76,7 +76,7 @@ class SelectTest {
             ) {}
             select(Column<Int>("id", "users"))
         }
-        assertEquals("SELECT users.id FROM users INNER JOIN orders", result.sql)
+        assertEquals("SELECT `users`.`id` FROM `users` INNER JOIN `orders`", result.sql)
     }
 
     @Test
@@ -106,7 +106,7 @@ class SelectTest {
             from("products")
             select(Column<Int>("position", "products") alias "order")
         }
-        assertEquals("SELECT position AS `order` FROM products", result.sql)
+        assertEquals("SELECT `position` AS `order` FROM `products`", result.sql)
     }
 
     @Test
@@ -161,23 +161,23 @@ class SelectTest {
     }
 
     @Test
-    fun `two identical unaliased aggregates are rejected`() {
+    fun `an unaliased aggregate in a multi-item select is rejected`() {
         val error = assertFailsWith<RoomQlException> {
             query {
                 from("orders")
-                select(countAll(), countAll())
+                select(countAll(), max(Column<Long>("total", "orders")))
             }
         }
-        assertEquals("select(...) returns more than one column named: COUNT(*); alias all but one", error.message)
+        assertEquals(
+            "select(...) with more than one item needs an alias on each aggregate, or Room can't map it: COUNT(*), MAX(orders.total)",
+            error.message,
+        )
     }
 
     @Test
-    fun `different unaliased aggregates are allowed`() {
-        val result = query {
-            from("orders")
-            select(countAll(), max(Column<Long>("total", "orders")))
-        }
-        assertEquals("SELECT COUNT(*), MAX(total) FROM orders", result.sql)
+    fun `a lone unaliased aggregate needs no alias`() {
+        val result = query { from("orders"); select(max(Column<Long>("total", "orders"))) }
+        assertEquals("SELECT MAX(`total`) FROM `orders`", result.sql)
     }
 
     @Test
@@ -187,6 +187,6 @@ class SelectTest {
             from("orders")
             select(*items)
         }
-        assertEquals("SELECT COUNT(*) AS `total` FROM orders", result.sql)
+        assertEquals("SELECT COUNT(*) AS `total` FROM `orders`", result.sql)
     }
 }

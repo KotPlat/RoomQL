@@ -105,7 +105,7 @@ public class WhereScope : ConditionScope() {
     // ---- Text matching ----
     //
     // The receiver bound keeps these off non-text columns. `like`/`notLike` take the SQL
-    // pattern verbatim; `contains` wraps the value in `%` for you.
+    // pattern verbatim; `contains` escapes the value's own `%`/`_` and wraps it in `%` for you.
 
     public infix fun <T : String?> Column<T>.like(value: String): Unit =
         add(Condition.Simple(this, "%s LIKE ?", listOf(value)))
@@ -114,7 +114,7 @@ public class WhereScope : ConditionScope() {
         add(Condition.Simple(this, "%s NOT LIKE ?", listOf(value)))
 
     public infix fun <T : String?> Column<T>.contains(value: String): Unit =
-        add(Condition.Simple(this, "%s LIKE ?", listOf("%$value%")))
+        add(containsCondition(this, value))
 
     public infix fun <T : String?> Column<T>.likeIfNotNull(value: String?): Unit =
         skipIfNull(value) { this like it }
@@ -145,14 +145,14 @@ public class WhereScope : ConditionScope() {
      * For "no filter" on an empty list instead, use [inListIfNotEmpty].
      */
     public infix fun <T> Column<T>.inList(values: List<T & Any>): Unit =
-        add(Condition.Simple(this, "%s IN (${values.placeholders()})", values))
+        add(membership(this, "IN", values))
 
     /**
      * An empty [values] renders `col NOT IN ()`, which SQLite defines as matching every row —
      * the opposite of [inList]'s empty case. For "no filter" instead, use [notInListIfNotEmpty].
      */
     public infix fun <T> Column<T>.notInList(values: List<T & Any>): Unit =
-        add(Condition.Simple(this, "%s NOT IN (${values.placeholders()})", values))
+        add(membership(this, "NOT IN", values))
 
     public infix fun <T> Column<T>.inListIfNotEmpty(values: List<T & Any>?): Unit =
         skipIfEmpty(values) { this inList it }
@@ -237,7 +237,7 @@ public class HavingScope : ConditionScope() {
         add(Condition.Simple(this, "%s NOT LIKE ?", listOf(value)))
 
     public infix fun <T : String?> Expression<T>.contains(value: String): Unit =
-        add(Condition.Simple(this, "%s LIKE ?", listOf("%$value%")))
+        add(containsCondition(this, value))
 
     public infix fun <T : String?> Expression<T>.likeIfNotNull(value: String?): Unit =
         skipIfNull(value) { this like it }
@@ -260,11 +260,11 @@ public class HavingScope : ConditionScope() {
 
     /** See [WhereScope.inList] for what an empty [values] renders. */
     public infix fun <T> Expression<T>.inList(values: List<T & Any>): Unit =
-        add(Condition.Simple(this, "%s IN (${values.placeholders()})", values))
+        add(membership(this, "IN", values))
 
     /** See [WhereScope.notInList] for what an empty [values] renders. */
     public infix fun <T> Expression<T>.notInList(values: List<T & Any>): Unit =
-        add(Condition.Simple(this, "%s NOT IN (${values.placeholders()})", values))
+        add(membership(this, "NOT IN", values))
 
     public infix fun <T> Expression<T>.inListIfNotEmpty(values: List<T & Any>?): Unit =
         skipIfEmpty(values) { this inList it }
@@ -279,7 +279,16 @@ public class HavingScope : ConditionScope() {
         add(Condition.Simple(this, "%s BETWEEN ? AND ?", listOf(lower, upper)))
 }
 
-private fun List<*>.placeholders(): String = joinToString(",") { "?" }
+// Escapes LIKE's wildcards so the user's text matches literally, e.g. "50%" doesn't also match "500".
+private fun containsCondition(expression: Expression<*>, value: String): Condition.Simple {
+    val escaped = value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return Condition.Simple(expression, "%s LIKE ? ESCAPE '\\'", listOf("%$escaped%"))
+}
+
+// Integers are inlined rather than bound so a long ID list doesn't hit the 999-argument cap on older Android.
+private fun membership(expression: Expression<*>, operator: String, values: List<*>): Condition.Simple =
+    if (values.isAllIntegers()) Condition.Simple(expression, "%s $operator (${values.joinToString(",")})", emptyList())
+    else Condition.Simple(expression, "%s $operator (${values.joinToString(",") { "?" }})", values)
 
 private inline fun <T : Any> skipIfNull(value: T?, emit: (T) -> Unit) {
     if (value != null) emit(value)

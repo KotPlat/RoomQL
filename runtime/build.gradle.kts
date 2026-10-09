@@ -31,6 +31,7 @@ java {
 dependencies {
     testImplementation(libs.kotlin.test)
     testImplementation(libs.junit5)
+    testImplementation(libs.sqlite.jdbc)
     testRuntimeOnly(libs.junit.platform.launcher)
 }
 

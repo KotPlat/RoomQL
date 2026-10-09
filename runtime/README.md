@@ -18,7 +18,7 @@ val q = query {
     orderBy(UserEntityTable.age, SortDirection.DESC)
 }
 
-assertEquals("SELECT * FROM users WHERE age >= ? ORDER BY age DESC", q.sql)
+assertEquals("SELECT * FROM `users` WHERE `age` >= ? ORDER BY `age` DESC", q.sql)
 assertEquals(listOf(18), q.args)
 ```
 
