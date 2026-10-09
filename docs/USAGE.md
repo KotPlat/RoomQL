@@ -260,7 +260,7 @@ val adults: List<UserEntity> = userDao.search(q.toQuery())
 Generated SQL:
 
 ```sql
-SELECT * FROM users WHERE age >= ?
+SELECT * FROM `users` WHERE `age` >= ?
 -- args: [18]
 ```
 
@@ -285,7 +285,7 @@ query {
 ```
 
 ```sql
-SELECT * FROM users WHERE age >= ? AND status = ?
+SELECT * FROM `users` WHERE `age` >= ? AND `status` = ?
 -- args: [18, "active"]
 ```
 
@@ -305,7 +305,7 @@ query {
 ```
 
 ```sql
-SELECT * FROM users WHERE status = ? AND (age < ? OR age > ?)
+SELECT * FROM `users` WHERE `status` = ? AND (`age` < ? OR `age` > ?)
 -- args: ["active", 18, 65]
 ```
 
@@ -397,57 +397,57 @@ Every operator that takes a value comes in two forms:
 ### Comparisons
 
 ```kotlin
-UserEntityTable.age eq 30                     // age = ?
-UserEntityTable.age eqIfNotNull minAge        // age = ?, or skipped
+UserEntityTable.age eq 30                     // `age` = ?
+UserEntityTable.age eqIfNotNull minAge        // `age` = ?, or skipped
 
-UserEntityTable.age notEq 30                  // age != ?
-UserEntityTable.age notEqIfNotNull minAge     // age != ?, or skipped
+UserEntityTable.age notEq 30                  // `age` != ?
+UserEntityTable.age notEqIfNotNull minAge     // `age` != ?, or skipped
 
-UserEntityTable.age gt 18                     // age > ?
-UserEntityTable.age gtIfNotNull minAge        // age > ?, or skipped
+UserEntityTable.age gt 18                     // `age` > ?
+UserEntityTable.age gtIfNotNull minAge        // `age` > ?, or skipped
 
-UserEntityTable.age gte 18                    // age >= ?
-UserEntityTable.age gteIfNotNull minAge       // age >= ?, or skipped
+UserEntityTable.age gte 18                    // `age` >= ?
+UserEntityTable.age gteIfNotNull minAge       // `age` >= ?, or skipped
 
-UserEntityTable.age lt 65                     // age < ?
-UserEntityTable.age ltIfNotNull maxAge        // age < ?, or skipped
+UserEntityTable.age lt 65                     // `age` < ?
+UserEntityTable.age ltIfNotNull maxAge        // `age` < ?, or skipped
 
-UserEntityTable.age lte 65                    // age <= ?
-UserEntityTable.age lteIfNotNull maxAge       // age <= ?, or skipped
+UserEntityTable.age lte 65                    // `age` <= ?
+UserEntityTable.age lteIfNotNull maxAge       // `age` <= ?, or skipped
 ```
 
 ### Text matching
 
 - `like` and `notLike` take a SQL pattern as-is, so you write the `%` wildcards yourself.
-- `contains` adds the wildcards for you: `contains "ali"` searches for `%ali%`.
+- `contains` adds the wildcards for you: `contains "ali"` searches for `%ali%`. A `%` or `_` in the text matches literally, so `contains "50%"` doesn't also match "500".
 
 All three only work on `String` columns, so you can't use them on a number column by mistake.
 
 ```kotlin
-UserEntityTable.name like "A%"                 // name LIKE ?         args: ["A%"]
-UserEntityTable.name likeIfNotNull pattern      // name LIKE ?, or skipped
+UserEntityTable.name like "A%"                 // `name` LIKE ?         args: ["A%"]
+UserEntityTable.name likeIfNotNull pattern      // `name` LIKE ?, or skipped
 
-UserEntityTable.name notLike "A%"              // name NOT LIKE ?     args: ["A%"]
-UserEntityTable.name notLikeIfNotNull pattern   // name NOT LIKE ?, or skipped
+UserEntityTable.name notLike "A%"              // `name` NOT LIKE ?     args: ["A%"]
+UserEntityTable.name notLikeIfNotNull pattern   // `name` NOT LIKE ?, or skipped
 
-UserEntityTable.name contains "ali"            // name LIKE ?         args: ["%ali%"]
-UserEntityTable.name containsIfNotNull query    // name LIKE ?, or skipped
+UserEntityTable.name contains "ali"            // `name` LIKE ? ESCAPE '\'   args: ["%ali%"]
+UserEntityTable.name containsIfNotNull query    // `name` LIKE ? ESCAPE '\', or skipped
 ```
 
 ### Sets
 
 ```kotlin
 UserEntityTable.status inList listOf("active", "pending")
-// status IN (?,?)   args: ["active", "pending"]
+// `status` IN (?,?)   args: ["active", "pending"]
 
 UserEntityTable.status inListIfNotEmpty selectedStatuses
-// status IN (?,?), or skipped if selectedStatuses is null or empty
+// `status` IN (?,?), or skipped if selectedStatuses is null or empty
 
 UserEntityTable.status notInList listOf("banned")
-// status NOT IN (?)  args: ["banned"]
+// `status` NOT IN (?)  args: ["banned"]
 
 UserEntityTable.status notInListIfNotEmpty excludedStatuses
-// status NOT IN (?), or skipped if excludedStatuses is null or empty
+// `status` NOT IN (?), or skipped if excludedStatuses is null or empty
 ```
 
 **Why "IfNotEmpty" and not "IfNotNull"?** Think of a filter screen with multi-select chips. If the user selects nothing, you get an empty list, and they mean "no filter". So an empty list has to skip, just like `null`.
@@ -464,7 +464,7 @@ If you need that behaviour, use the plain form. If an empty list should mean "no
 ### Ranges
 
 ```kotlin
-UserEntityTable.age.between(18, 65)     // age BETWEEN ? AND ?   args: [18, 65]
+UserEntityTable.age.between(18, 65)     // `age` BETWEEN ? AND ?   args: [18, 65]
 ```
 
 `between` needs both bounds, and there is no `betweenIfNotNull`.
@@ -483,8 +483,8 @@ This handles every case correctly: both bounds, just one, or neither.
 ### Null checks
 
 ```kotlin
-UserEntityTable.status.isNull()      // status IS NULL
-UserEntityTable.status.isNotNull()   // status IS NOT NULL
+UserEntityTable.status.isNull()      // `status` IS NULL
+UserEntityTable.status.isNotNull()   // `status` IS NOT NULL
 ```
 
 This is how you match SQL `NULL` itself. They take no value, so there is nothing to make optional.
@@ -518,14 +518,14 @@ query {
 ```
 
 ```sql
-SELECT * FROM users ORDER BY age DESC, name ASC LIMIT 20 OFFSET 40
+SELECT * FROM `users` ORDER BY `age` DESC, `name` ASC LIMIT 20 OFFSET 40
 ```
 
 For paging, `limit` is the page size, and `offset` is how many rows to skip. The example above is page 3 of 20 rows each.
 
 Two rules, checked when the query is built:
 
-- `limit(n)` must be **positive**.
+- `limit(n)` can't be **negative**. `limit(0)` is allowed and returns no rows.
 - `offset(n)` needs a `limit` too. SQLite requires this, not RoomQL.
 
 **Why does RoomQL help here?** Because the sort column is a `Column<T>` value, you can choose it at runtime from a dropdown. Plain SQL can't do that with a `?` parameter, since a column name can't be bound.
@@ -545,7 +545,7 @@ query {
 ```
 
 ```sql
-SELECT * FROM orders GROUP BY userId HAVING total > ?
+SELECT * FROM `orders` GROUP BY `userId` HAVING `total` > ?
 -- args: [100.0]
 ```
 
@@ -563,7 +563,7 @@ query {
 ```
 
 ```sql
-SELECT * FROM orders GROUP BY userId, status
+SELECT * FROM `orders` GROUP BY `userId`, `status`
 ```
 
 **Aggregates** summarise a group: `count`, `countAll`, `sum`, `avg`, `min`, `max` (see [API.md](API.md)). You can use them in `having { }` and `orderBy(...)`, and return them with `select(...)`, covered in the [next section](#selecting-specific-columns-and-aggregates-with-select).
@@ -587,7 +587,7 @@ query {
 ```
 
 ```sql
-SELECT COUNT(*) FROM products WHERE category = ?
+SELECT COUNT(*) FROM `products` WHERE `category` = ?
 -- args: ["electronics"]
 ```
 
@@ -613,7 +613,7 @@ query {
 ```
 
 ```sql
-SELECT customerId, COUNT(id) AS `order_count` FROM orders GROUP BY customerId
+SELECT `customerId`, COUNT(`id`) AS `order_count` FROM `orders` GROUP BY `customerId`
 ```
 
 A few things `alias` handles for you:
@@ -701,9 +701,9 @@ To join more than two tables, call `join` again.
 RoomQL prevents this. When a column name appears in more than one table, it renames that column to `table__column`. Names that are unique stay as they are:
 
 ```sql
-SELECT users.id AS users__id, name, age, users.status AS users__status,
-       orders.id AS orders__id, userId, total, orders.status AS orders__status
-FROM users INNER JOIN orders ON users.id = orders.userId
+SELECT `users`.`id` AS `users__id`, `name`, `age`, `users`.`status` AS `users__status`,
+       `orders`.`id` AS `orders__id`, `userId`, `total`, `orders`.`status` AS `orders__status`
+FROM `users` INNER JOIN `orders` ON `users`.`id` = `orders`.`userId`
 ```
 
 The same detection also applies to your conditions. In `where { }`, `having { }`, `groupBy(...)`, and `orderBy(...)`, a clashing column gets its table name in front. For example, `where { OrderEntityTable.status eq "paid" }` becomes `WHERE orders.status = ?`, not the ambiguous `WHERE status = ?`.
@@ -802,7 +802,7 @@ Every case that throws:
 | Mistake | Message |
 |---|---|
 | No `from()` | `from() must be called before build()` |
-| `limit(0)` or negative | `limit() must be a positive integer, got 0` |
+| Negative `limit()` | `limit() must not be negative, got -1` |
 | `offset()` without `limit()` | `offset() requires limit() to be set` |
 | `having { }` without `groupBy()` | `having() requires groupBy() to be set` |
 | `join()` after a raw-string `from(String)` | `join() requires from(EntityTable) so columns can be aliased; from(String) has no column metadata` |
@@ -810,6 +810,12 @@ Every case that throws:
 | `select(...)` mixing an aggregate with a bare column, ungrouped | `select(...) cannot mix an aggregate with a bare column unless groupBy() is set` |
 | `alias()` name containing a backtick | `alias() names cannot contain a backtick: <names>` |
 | `select(...)` items sharing an output name | `select(...) returns more than one column named: <names>; alias all but one` |
+| A table or column name containing a backtick | `table and column names cannot contain a backtick: <name>` |
+| The same table twice in `from()`/`join()` (a self-join) | `table <name> appears more than once in from()/join(); self-joins aren't supported yet` |
+| A column from a table not in `from()`/`join()` | `column(s) from a table not in from()/join(): <table.column>` |
+| `select(...)` with several items and an unaliased aggregate | `select(...) with more than one item needs an alias on each aggregate, or Room can't map it: <aggregates>` |
+| A value only a `@TypeConverter` can store (`Date`, `Instant`, …) | `can't bind a <type> to <table.column>: Room stores it through a @TypeConverter, …` |
+| More than 999 bound values | `query binds <n> values, but SQLite on Android API 30 and below allows at most 999. …` |
 
 **Why unchecked?** These are bugs in how the query is written, not bad user input. A wrong query is wrong every time it runs, so it fails the first time you hit that code path, usually during development. You don't need a `try`/`catch` around every query.
 
@@ -896,7 +902,7 @@ fun `null status is omitted`() {
             UserEntityTable.status eqIfNotNull status
         }
     }
-    assertEquals("SELECT * FROM users WHERE age >= ?", q.sql)
+    assertEquals("SELECT * FROM `users` WHERE `age` >= ?", q.sql)
     assertEquals(listOf(18), q.args)
 }
 ```
@@ -951,6 +957,24 @@ For a join, list **every** table the query touches, not just the one in `from(..
 When joined tables share a column name, RoomQL renames the clashing columns to `table__column`, for example `users__id`. A field looking for plain `id` finds nothing.
 
 Map those fields with `@ColumnInfo(name = "users__id")`. Columns with names unique across the join keep their plain names.
+
+### Why does a LEFT JOIN crash with "Parameter specified as non-null is null"?
+
+A `LEFT JOIN` returns `NULL` for every joined column of a row with no match. Room then passes that `NULL` into your result class's constructor, and Kotlin rejects it for a non-null parameter.
+
+Declare every field that comes from the left-joined table as nullable, for example `val brandName: String?`.
+
+### Why does sum, min or max return 0 instead of null?
+
+Over zero rows, `SUM`, `MIN` and `MAX` return `NULL`. Into a non-null `Long` return type, Room maps that `NULL` to `0` without telling you. Declare the DAO method's return type nullable (`Long?`) to tell "no rows" apart from a real `0`.
+
+### Why does build() throw "can't bind a ... Room stores it through a @TypeConverter"?
+
+RoomQL binds enums, `UUID` and `Char` the way Room stores them. It can't apply your own `@TypeConverter`s, so a `Column<Date>` value can't be bound. Filter on the stored form with a matching column instead: `Column<Long>("created_at", "users") gte date.time`.
+
+### Can I join a table to itself?
+
+Not yet. A self-join needs table aliases, which RoomQL doesn't have, so `build()` throws instead of sending SQL that SQLite rejects as ambiguous.
 
 ### Why does build() throw "join() requires from(EntityTable)"?
 

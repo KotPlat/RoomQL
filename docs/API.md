@@ -59,7 +59,7 @@ The receiver inside `query { }`. Marked `@RoomQlDsl`, so outer-scope members can
 | `having` | `having(block: HavingScope.() -> Unit)` | Opens a `HavingScope` for `HAVING`. Requires `groupBy`. |
 | `select` | `select(vararg items: SelectItem<*>)` | Projects specific columns/aggregates instead of whole rows. See [Projections](#projections). |
 | `orderBy` | `orderBy(expression: Expression<*>, direction: SortDirection)` | Appends a sort key. Call repeatedly for a multi-column `ORDER BY`. |
-| `limit` | `limit(n: Int)` | Sets `LIMIT`. Must be positive. |
+| `limit` | `limit(n: Int)` | Sets `LIMIT`. `0` returns no rows; negative throws. |
 | `offset` | `offset(n: Int)` | Sets `OFFSET`. Requires `limit`. |
 | `build` | `build(): RoomQlQuery` | Validates and renders. `query { }` calls this for you. |
 
@@ -89,9 +89,9 @@ The receiver inside `query { }`. Marked `@RoomQlDsl`, so outer-scope members can
 | `likeIfNotNull` | `infix fun <T : String?> Column<T>.likeIfNotNull(value: String?)` | `col LIKE ?`, or skipped |
 | `notLike` | `infix fun <T : String?> Column<T>.notLike(value: String)` | `col NOT LIKE ?` |
 | `notLikeIfNotNull` | `infix fun <T : String?> Column<T>.notLikeIfNotNull(value: String?)` | `col NOT LIKE ?`, or skipped |
-| `contains` | `infix fun <T : String?> Column<T>.contains(value: String)` | `col LIKE ?`, bound as `%value%` |
-| `containsIfNotNull` | `infix fun <T : String?> Column<T>.containsIfNotNull(value: String?)` | `col LIKE ?`, bound as `%value%`, or skipped |
-| `inList` | `infix fun <T> Column<T>.inList(values: List<T & Any>)` | `col IN (?,?)`; an empty list renders `col IN ()`, which SQLite defines as matching nothing |
+| `contains` | `infix fun <T : String?> Column<T>.contains(value: String)` | `col LIKE ? ESCAPE '\'`, bound as `%value%` with `%`, `_` and `\` in `value` escaped |
+| `containsIfNotNull` | `infix fun <T : String?> Column<T>.containsIfNotNull(value: String?)` | Same as `contains`, or skipped |
+| `inList` | `infix fun <T> Column<T>.inList(values: List<T & Any>)` | `col IN (?,?)`, or `col IN (1,2)` for integers, which are inlined so a long ID list stays under SQLite's 999-argument cap; an empty list renders `col IN ()`, which SQLite defines as matching nothing |
 | `inListIfNotEmpty` | `infix fun <T> Column<T>.inListIfNotEmpty(values: List<T & Any>?)` | `col IN (?,?)`, or skipped if the list is `null` or empty |
 | `notInList` | `infix fun <T> Column<T>.notInList(values: List<T & Any>)` | `col NOT IN (?)`; an empty list renders `col NOT IN ()`, which SQLite defines as matching everything |
 | `notInListIfNotEmpty` | `infix fun <T> Column<T>.notInListIfNotEmpty(values: List<T & Any>?)` | `col NOT IN (?)`, or skipped if the list is `null` or empty |
@@ -99,7 +99,7 @@ The receiver inside `query { }`. Marked `@RoomQlDsl`, so outer-scope members can
 | `isNull` | `fun <T> Column<T>.isNull()` | `col IS NULL` |
 | `isNotNull` | `fun <T> Column<T>.isNotNull()` | `col IS NOT NULL` |
 
-`like`, `notLike`, and `contains` are constrained to `String` columns (`T : String?`), so they cannot be applied to a numeric column. `like` and `notLike` take the SQL pattern verbatim; `contains` adds the `%` wildcards for you.
+`like`, `notLike`, and `contains` are constrained to `String` columns (`T : String?`), so they cannot be applied to a numeric column. `like` and `notLike` take the SQL pattern verbatim; `contains` adds the `%` wildcards for you and escapes any `%`, `_` or `\` in the text, so it matches literally.
 
 **`T & Any` is a compile-time guarantee, not a runtime one.** Generics erase, so a `null` crossing an erased boundary — a Java caller, or an unchecked cast — is not stopped by the type at the JVM level. It is still caught: every operator above is a public function with a non-null parameter, so Kotlin compiles a `checkNotNullParameter` guard into `runtime`'s own bytecode, and such a call throws `NullPointerException` immediately rather than silently binding `NULL` into the arguments. `internal` and `private` functions do not get this guard by default; every operator here is `public`, so all of them do.
 
@@ -119,7 +119,7 @@ where {
         UserEntityTable.age gt 65
     }
 }
-// WHERE status = ? AND (age < ? OR age > ?)
+// WHERE `status` = ? AND (`age` < ? OR `age` > ?)
 ```
 
 ### JoinScope and JoinConditionScope
@@ -143,6 +143,10 @@ public data class Column<T>(val columnName: String, val tableName: String)
 ```
 
 A typed reference to one SQL column. You do not construct these — the KSP processor generates one per entity property, and `T` carries the property's Kotlin type (including nullability) so that operators type-check against it.
+
+Every table and column name renders backtick-quoted, as Room's own SQL does, so reserved words such as `order` or `group` work as names.
+
+Values bind in the form Room stores them: an enum as its `name`, a `UUID` as Room's 16-byte BLOB, a `Char` as its code point. A type Room can only store through a `@TypeConverter` (`Date`, `Instant`, …) throws `RoomQlException` at `build()`, because RoomQL can't apply your converter. Filter on the stored form instead, with a column typed to match it: `Column<Long>("created_at", "users") gte date.time`.
 
 ### Aggregate functions
 
@@ -188,7 +192,7 @@ val q = query {
     where { ProductTable.category eq "electronics" }
     select(countAll())
 }
-// SELECT COUNT(*) FROM products WHERE category = ?
+// SELECT COUNT(*) FROM `products` WHERE `category` = ?
 ```
 
 A single unaliased expression needs no name — Room binds it straight to a scalar return type (`Int`, `Long`, …), exactly like any other query. `alias` names an expression's output column, for a multi-column projection:
@@ -198,7 +202,7 @@ select(
     CategoryTable.id alias "category_id",
     count(ProductTable.id) alias "product_count",
 )
-// SELECT id AS `category_id`, COUNT(id) AS `product_count` FROM ...
+// SELECT `id` AS `category_id`, COUNT(`id`) AS `product_count` FROM ...
 ```
 
 The alias is backtick-quoted, so a reserved word (`order`, `group`) works as a name; SQLite reports the column unquoted, so Room still maps it by the plain name.
@@ -207,7 +211,8 @@ The alias is backtick-quoted, so a reserved word (`order`, `group`) works as a n
 
 - A **grouped** query (`groupBy(...)` set) whose projection has a bare column absent from `GROUP BY` throws — SQLite would otherwise pick an arbitrary row's value for it.
 - An **ungrouped** query mixing an aggregate with a bare column throws for the same reason, without an explicit `GROUP BY` to name.
-- Two items with the same output name (an alias, a bare column's name, or an unaliased aggregate's SQL text such as `COUNT(*)`) throw — Room would bind only one of them. This includes the same column name from two joined tables, such as `select(UserTable.id, OrderTable.id)`: alias all but one.
+- An unaliased aggregate in a `select(...)` with more than one item throws. Its output name is its SQL text, such as ``COUNT(`id`)``, which no result-class field can map, so Room would silently leave the field at `0`. A lone `select(countAll())` needs no alias.
+- Two items with the same output name (an alias or a bare column's name) throw — Room would bind only one of them. This includes the same column name from two joined tables, such as `select(UserTable.id, OrderTable.id)`: alias all but one.
 - An alias containing a backtick throws, since it cannot be quoted.
 - An ungrouped, aggregate-free multi-column projection (`select(a, b)`) passes through uncaught — an ordinary `SELECT a, b`, nothing unsafe about it.
 
@@ -249,7 +254,7 @@ select(
         avg(ProductTable.price),
     )
 )
-// SELECT id AS `category_id`, name AS `category_name`, COUNT(id) AS `productCount`, AVG(price) AS `avg_price` FROM ...
+// SELECT `id` AS `category_id`, `name` AS `category_name`, COUNT(`id`) AS `productCount`, AVG(`price`) AS `avg_price` FROM ...
 ```
 
 A missing or mismatched-type argument to the generated function is then an ordinary Kotlin compile error at the call site — the same mechanism as forgetting a constructor argument — rather than a runtime `RoomQlException`. The generated function takes the annotated class's visibility, so an `internal` class gets an `internal` factory. `@Projection` has `SOURCE` retention: nothing about it survives into the compiled class, consistent with RoomQL's no-reflection guarantee. It only covers the constructor-property shape; for anything else, fall back to the plain `alias` infix.
@@ -295,7 +300,7 @@ Thrown by `build()` — and therefore by `query { }` — when the configured que
 | Mistake | Message |
 |---|---|
 | No `from()` | `from() must be called before build()` |
-| `limit(0)` or negative | `limit() must be a positive integer, got 0` |
+| Negative `limit()` | `limit() must not be negative, got -1` |
 | `offset()` without `limit()` | `offset() requires limit() to be set` |
 | `having { }` without `groupBy()` | `having() requires groupBy() to be set` |
 | `join()` after a raw-string `from(String)` | `join() requires from(EntityTable) so columns can be aliased; from(String) has no column metadata` |
@@ -303,6 +308,12 @@ Thrown by `build()` — and therefore by `query { }` — when the configured que
 | `select(...)` mixing an aggregate with a bare column, ungrouped | `select(...) cannot mix an aggregate with a bare column unless groupBy() is set` |
 | `alias()` name containing a backtick | `alias() names cannot contain a backtick: <names>` |
 | `select(...)` items sharing an output name | `select(...) returns more than one column named: <names>; alias all but one` |
+| A table or column name containing a backtick | `table and column names cannot contain a backtick: <name>` |
+| The same table twice in `from()`/`join()` (a self-join) | `table <name> appears more than once in from()/join(); self-joins aren't supported yet` |
+| A column from a table not in `from()`/`join()` | `column(s) from a table not in from()/join(): <table.column>` |
+| `select(...)` with several items and an unaliased aggregate | `select(...) with more than one item needs an alias on each aggregate, or Room can't map it: <aggregates>` |
+| A value only a `@TypeConverter` can store (`Date`, `Instant`, …) | `can't bind a <type> to <table.column>: Room stores it through a @TypeConverter, …` |
+| More than 999 bound values | `query binds <n> values, but SQLite on Android API 30 and below allows at most 999. …` |
 
 ---
 
@@ -377,5 +388,7 @@ the processor generates `object UserEntityTable : EntityTable` in the **same pac
 | `id` | `Column<Int>` | SQL column `id` |
 | `name` | `Column<String>` | SQL column `name` |
 | `createdAt` | `Column<Long>` | SQL column `created_at` |
+
+Only properties Room stores as columns are generated: `@Ignore`d, `@Transient`, and computed (no backing field) properties are skipped. An `@Embedded` property becomes a nested group of its real columns, with the `prefix` applied (and accumulated through nested `@Embedded`s): `UserEntityTable.address.city` → `Column("addr_city", "users")`. Columns under a nullable `@Embedded` are nullable.
 
 Because each column is a real Kotlin symbol, renaming or deleting a property breaks every query that referenced it at **compile** time. Note that RoomQL checks column *references* only — Room's `@RawQuery` skips Room's static SQL verification, so query logic is still verified at runtime. See the [comparison in the README](../README.md#how-roomql-compares-to-the-alternatives).

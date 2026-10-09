@@ -4,6 +4,35 @@ All notable changes to **RoomQL** are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and RoomQL follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Enum, `UUID` and `Char` values no longer crash at query time.** They bind in the form Room
+  stores them (enum `name`, 16-byte `UUID` BLOB, `Char` code point). A type only a
+  `@TypeConverter` can store throws `RoomQlException` at `build()`, naming the column, instead of
+  `IllegalArgumentException: Cannot bind` inside `SimpleSQLiteQuery`. See #88.
+- **Reserved-word table and column names work.** Every identifier is backtick-quoted, as Room's
+  own SQL is; a name containing a backtick throws. See #89.
+- **Large integer `inList`/`notInList` no longer hit SQLite's 999-argument cap on API 30 and
+  below.** Integer values are inlined into the SQL; a query still binding more than 999 values
+  throws at `build()`. See #90.
+- **The KSP processor generates only real columns.** Computed, `@Transient` and `@Relation`
+  properties are skipped, and `@Embedded` properties expand into their prefixed columns as a
+  nested group (`UserEntityTable.address.city`). See #91.
+- **`contains()` matches `%` and `_` literally.** The text is escaped and the SQL adds
+  `ESCAPE '\'`, so searching "50%" no longer also matches "500". `like`/`notLike` still take a
+  raw pattern. See #97.
+
+### Changed
+
+- **Generated SQL quotes every identifier**, e.g. ``SELECT * FROM `users` WHERE `age` >= ?``.
+  Tests asserting on `RoomQlQuery.sql` need updating. See #89.
+- **`limit(0)` is allowed** and returns no rows; only a negative limit throws. See #95.
+- **`build()` rejects more mistakes before they reach SQLite**: a self-join (#92), a column from a
+  table not in `from()`/`join()` (#93), and an unaliased aggregate in a multi-item `select(...)`,
+  which Room would silently map as `0` (#94).
+
 ## [2.0.0] - 2026-09-23
 
 ### Added
