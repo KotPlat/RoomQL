@@ -3,7 +3,7 @@
 The **RoomQL** query DSL — a type-safe Kotlin builder for dynamic SQLite queries, with **no Android dependency**. This is the module that defines `query { }`, `Column<T>`, and the null-skipping condition operators.
 
 ```
-io.github.kotplat.roomql:runtime:2.0.0
+io.github.kotplat.roomql:runtime:2.0.1
 ```
 
 Pure JVM, so you can build a query and assert on the generated SQL in an ordinary unit test — no emulator, no Robolectric:
@@ -18,7 +18,7 @@ val q = query {
     orderBy(UserEntityTable.age, SortDirection.DESC)
 }
 
-assertEquals("SELECT * FROM users WHERE age >= ? ORDER BY age DESC", q.sql)
+assertEquals("SELECT * FROM `users` WHERE `age` >= ? ORDER BY `age` DESC", q.sql)
 assertEquals(listOf(18), q.args)
 ```
 

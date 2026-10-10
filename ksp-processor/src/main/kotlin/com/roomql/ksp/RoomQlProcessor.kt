@@ -10,6 +10,7 @@ import com.google.devtools.ksp.symbol.KSAnnotation
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.google.devtools.ksp.symbol.KSValueParameter
+import com.google.devtools.ksp.symbol.Modifier
 import com.google.devtools.ksp.symbol.Visibility
 import com.google.devtools.ksp.validate
 import com.squareup.kotlinpoet.ARRAY
@@ -23,6 +24,7 @@ import com.squareup.kotlinpoet.ParameterSpec
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.PropertySpec
 import com.squareup.kotlinpoet.STAR
+import com.squareup.kotlinpoet.TypeName
 import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.asClassName
 import com.squareup.kotlinpoet.ksp.addOriginatingKSFile
@@ -32,6 +34,9 @@ import com.squareup.kotlinpoet.ksp.writeTo
 private const val ENTITY_ANNOTATION = "androidx.room.Entity"
 private const val COLUMN_INFO_ANNOTATION = "androidx.room.ColumnInfo"
 private const val IGNORE_ANNOTATION = "androidx.room.Ignore"
+private const val EMBEDDED_ANNOTATION = "androidx.room.Embedded"
+private const val RELATION_ANNOTATION = "androidx.room.Relation"
+private const val TRANSIENT_ANNOTATION = "kotlin.jvm.Transient"
 private const val PROJECTION_ANNOTATION = "com.roomql.runtime.Projection"
 private const val TABLE_SUFFIX_OPTION = "roomql.tableSuffix"
 private const val DEFAULT_TABLE_SUFFIX = "Table"
@@ -66,8 +71,8 @@ internal class RoomQlProcessor(private val environment: SymbolProcessorEnvironme
         val packageName = classDecl.packageName.asString()
         val objectName = "${classDecl.simpleName.asString()}$tableSuffix"
 
-        val props = classDecl.getAllProperties().filterNot { it.hasAnnotation(IGNORE_ANNOTATION) }.toList()
-        val columnNames = props.map { extractColumnName(it) }
+        val members = collectMembers(classDecl, prefix = "", nullable = false)
+        val columnNames = members.flatMap { it.columnNames() }
 
         val typeSpec = TypeSpec.objectBuilder(objectName)
             .addSuperinterface(ENTITY_TABLE_CLASS)
@@ -83,14 +88,7 @@ internal class RoomQlProcessor(private val environment: SymbolProcessorEnvironme
                         .initializer("listOf(${columnNames.joinToString(", ") { "%S" }})", *columnNames.toTypedArray())
                         .build()
                 )
-                props.forEach { prop ->
-                    val columnType = COLUMN_CLASS.parameterizedBy(prop.type.resolve().toTypeName())
-                    addProperty(
-                        PropertySpec.builder(prop.simpleName.asString(), columnType)
-                            .initializer("%T(%S, %S)", COLUMN_CLASS, extractColumnName(prop), tableName)
-                            .build()
-                    )
-                }
+                addMembers(members, tableName)
             }
             .build()
 
@@ -98,6 +96,39 @@ internal class RoomQlProcessor(private val environment: SymbolProcessorEnvironme
             .addType(typeSpec)
             .build()
             .writeTo(environment.codeGenerator, aggregating = false)
+    }
+
+    /** The properties Room stores as columns, with `@Embedded` ones expanded under their cumulative prefix. */
+    private fun collectMembers(classDecl: KSClassDeclaration, prefix: String, nullable: Boolean): List<Member> =
+        classDecl.getAllProperties().filter { it.isStoredByRoom() }.mapNotNull { prop ->
+            val type = prop.type.resolve()
+            if (prop.hasAnnotation(EMBEDDED_ANNOTATION)) {
+                val embeddedClass = type.declaration as? KSClassDeclaration ?: return@mapNotNull null
+                val childPrefix = prefix + findAnnotationArg(prop.annotations, EMBEDDED_ANNOTATION, "prefix").orEmpty()
+                Member.Embedded(prop.simpleName.asString(), collectMembers(embeddedClass, childPrefix, nullable || type.isMarkedNullable))
+            } else {
+                val typeName = type.toTypeName()
+                Member.Field(prop.simpleName.asString(), prefix + extractColumnName(prop), if (nullable) typeName.copy(nullable = true) else typeName)
+            }
+        }.toList()
+
+    private fun TypeSpec.Builder.addMembers(members: List<Member>, tableName: String) {
+        members.forEach { member ->
+            when (member) {
+                is Member.Field -> addProperty(
+                    PropertySpec.builder(member.propertyName, COLUMN_CLASS.parameterizedBy(member.type))
+                        .initializer("%T(%S, %S)", COLUMN_CLASS, member.columnName, tableName)
+                        .build()
+                )
+                // A property over a nested object, since an object nested in an object isn't reachable through a value.
+                is Member.Embedded -> {
+                    val objectName = member.propertyName.replaceFirstChar { it.uppercase() } + "Columns"
+                    addType(TypeSpec.objectBuilder(objectName).apply { addMembers(member.members, tableName) }.build())
+                    val objectType = ClassName("", objectName)
+                    addProperty(PropertySpec.builder(member.propertyName, objectType).initializer("%T", objectType).build())
+                }
+            }
+        }
     }
 
     /** Generates `<ClassName>Projection(...)`: one `Expression<T>` per constructor property, returned aliased. */
@@ -189,6 +220,24 @@ internal class RoomQlProcessor(private val environment: SymbolProcessorEnvironme
         }
         return value
     }
+}
+
+private sealed interface Member {
+    data class Field(val propertyName: String, val columnName: String, val type: TypeName) : Member
+    data class Embedded(val propertyName: String, val members: List<Member>) : Member
+}
+
+private fun Member.columnNames(): List<String> = when (this) {
+    is Member.Field -> listOf(columnName)
+    is Member.Embedded -> members.flatMap { it.columnNames() }
+}
+
+// Mirrors Room's own field filter: no @Ignore/@Relation/static, a real backing field, and transient only if annotated.
+private fun KSPropertyDeclaration.isStoredByRoom(): Boolean {
+    if (hasAnnotation(IGNORE_ANNOTATION) || hasAnnotation(RELATION_ANNOTATION) || !hasBackingField) return false
+    if (Modifier.JAVA_STATIC in modifiers) return false
+    val transient = Modifier.JAVA_TRANSIENT in modifiers || hasAnnotation(TRANSIENT_ANNOTATION)
+    return !transient || hasAnnotation(COLUMN_INFO_ANNOTATION) || hasAnnotation(EMBEDDED_ANNOTATION)
 }
 
 private fun KSPropertyDeclaration.hasAnnotation(annotationFqn: String): Boolean =

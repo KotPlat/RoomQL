@@ -41,7 +41,7 @@ Declare the version catalog entries (`gradle/libs.versions.toml`):
 
 ```toml
 [versions]
-roomql = "2.0.0"
+roomql = "2.0.1"
 
 [libraries]
 roomql-runtime-android = { module = "io.github.kotplat.roomql:runtime-android", version.ref = "roomql" }
@@ -147,7 +147,7 @@ Both calls run through the same method with no branching, no `CASE` ladder, and 
 - **Optional filters that disappear, and say so.** `age gteIfNotNull minAge` drops the condition from the SQL when `minAge` is null; the plain `age gte minAge` is required and will not compile with a nullable value. Reading the operator name tells you which one you have.
 - **A real DSL, not string concatenation.** `where`, `or { }`, `orderBy`, `limit`/`offset`, `groupBy`/`having`, `select`, `join`. Values are bound as positional `?` parameters, so there is no injection surface.
 - **Aggregates and explicit projections.** `count`, `countAll`, `sum`, `avg`, `min`, `max` work in `having { }` and `orderBy`; `select(...)` projects them (or specific columns) instead of whole rows. `@Projection` generates a typed factory function for a multi-column result class, so a missing field is a compile error rather than a silently unmapped column.
-- **Automatic JOIN column aliasing.** Colliding column names across joined tables are aliased (`users.id AS users__id`) so a cursor never silently overwrites one column with another.
+- **Automatic JOIN column aliasing.** Colliding column names across joined tables are aliased (`` `users`.`id` AS `users__id` ``) so a cursor never silently overwrites one column with another.
 - **Works with Room's own `@RawQuery`.** The output is a plain `SupportSQLiteQuery`. Blocking, `suspend`, and `Flow` return types all work — Room does the rest.
 
 ## Documentation
@@ -175,7 +175,7 @@ RoomQL's entire public surface, across all three artifacts. Signatures, generic 
 | [`WhereScope`, `HavingScope`](docs/API.md#wherescope-and-havingscope-the-condition-operators) | runtime | Receivers inside `where { }` (`Column<T>`-only) and `having { }` (any `Expression<T>`, aggregates included). Both carry every operator below, plus `or { }` for alternatives. |
 | `eq`, `notEq`, `gt`, `gte`, `lt`, `lte` | runtime | Comparisons. Required — a nullable value will not compile. |
 | `eqIfNotNull`, `notEqIfNotNull`, `gtIfNotNull`, `gteIfNotNull`, `ltIfNotNull`, `lteIfNotNull` | runtime | The optional forms. Skip when the value is `null`. |
-| `like`, `notLike`, `contains` | runtime | Text matching on `String` columns. Required. `contains` adds the `%` wildcards for you. |
+| `like`, `notLike`, `contains` | runtime | Text matching on `String` columns. Required. `contains` adds the `%` wildcards for you and matches the text literally. |
 | `likeIfNotNull`, `notLikeIfNotNull`, `containsIfNotNull` | runtime | The optional forms. Skip when the value is `null`. |
 | `inList`, `notInList` | runtime | Set membership. Required — an empty list renders `IN ()`, which SQLite defines as matching nothing. |
 | `inListIfNotEmpty`, `notInListIfNotEmpty` | runtime | The optional forms. Skip when the list is `null` or empty. |
@@ -259,7 +259,7 @@ Know these before adopting:
 - **You must call `.toQuery()`.** The DSL output is a plain-JVM `RoomQlQuery`; `.toQuery()` (from `:runtime-android`) adapts it. One call at the DAO boundary is the price of an emulator-free test path.
 - **Positional `?` args only.** No named parameters — a Room `@RawQuery` restriction.
 - **`QueryBuilder` is not thread-safe.** Build a query on one thread or coroutine; never share a half-built builder.
-- **Validation is deferred to `build()`.** Missing `from()`, a non-positive `limit`, `offset` without `limit`, and `having` without `groupBy` all throw `RoomQlException` at build time, not while you configure.
+- **Validation is deferred to `build()`.** Missing `from()`, a negative `limit`, `offset` without `limit`, and `having` without `groupBy` all throw `RoomQlException` at build time, not while you configure.
 - **No `DISTINCT`, subqueries, or `UNION`.** `select(...)` covers explicit projections and aggregates; these three remain out of scope.
 - **`@Projection`-generated factories only cover the constructor-property shape.** A result class outside that shape (a computed property, a shape KSP can't infer) still names its columns with the plain `alias` infix instead.
 - **Room version range.** Targets Room 2.6.x–2.7.x (API 21+): CI tests 2.6.1, and `scripts/verify-toolchains.sh` tests 2.7.2 before each release. Room 2.8 raised `minSdk` to 23; support is deferred.

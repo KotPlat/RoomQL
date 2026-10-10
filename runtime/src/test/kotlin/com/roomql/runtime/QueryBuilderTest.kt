@@ -29,7 +29,7 @@ class QueryBuilderTest {
     @Test
     fun `bare from produces SELECT star FROM table`() {
         val result = query { from("users") }
-        assertEquals("SELECT * FROM users", result.sql)
+        assertEquals("SELECT * FROM `users`", result.sql)
         assertEquals(0, result.args.size)
     }
 
@@ -48,7 +48,7 @@ class QueryBuilderTest {
             from("users")
             where { Column<Int>("age", "users") eq 18 }
         }
-        assertEquals("SELECT * FROM users WHERE age = ?", result.sql)
+        assertEquals("SELECT * FROM `users` WHERE `age` = ?", result.sql)
         assertEquals(listOf(18), result.args.toList())
     }
 
@@ -58,7 +58,7 @@ class QueryBuilderTest {
             from("users")
             where { Column<String>("status", "users") notEq "inactive" }
         }
-        assertEquals("SELECT * FROM users WHERE status != ?", result.sql)
+        assertEquals("SELECT * FROM `users` WHERE `status` != ?", result.sql)
     }
 
     @Test
@@ -68,7 +68,7 @@ class QueryBuilderTest {
             from("users")
             where { Column<Int>("age", "users") eqIfNotNull age }
         }
-        assertEquals("SELECT * FROM users", result.sql)
+        assertEquals("SELECT * FROM `users`", result.sql)
         assertEquals(0, result.args.size)
     }
 
@@ -95,7 +95,7 @@ class QueryBuilderTest {
             from("users")
             where { Column<Int>("age", "users") gt 18 }
         }
-        assertEquals("SELECT * FROM users WHERE age > ?", result.sql)
+        assertEquals("SELECT * FROM `users` WHERE `age` > ?", result.sql)
         assertEquals(listOf(18), result.args.toList())
     }
 
@@ -105,7 +105,7 @@ class QueryBuilderTest {
             from("users")
             where { Column<Int>("age", "users") gte 18 }
         }
-        assertEquals("SELECT * FROM users WHERE age >= ?", result.sql)
+        assertEquals("SELECT * FROM `users` WHERE `age` >= ?", result.sql)
     }
 
     @Test
@@ -114,7 +114,7 @@ class QueryBuilderTest {
             from("users")
             where { Column<Int>("age", "users") lt 65 }
         }
-        assertEquals("SELECT * FROM users WHERE age < ?", result.sql)
+        assertEquals("SELECT * FROM `users` WHERE `age` < ?", result.sql)
     }
 
     @Test
@@ -123,7 +123,7 @@ class QueryBuilderTest {
             from("users")
             where { Column<Int>("age", "users") lte 65 }
         }
-        assertEquals("SELECT * FROM users WHERE age <= ?", result.sql)
+        assertEquals("SELECT * FROM `users` WHERE `age` <= ?", result.sql)
     }
 
     // --- WHERE: like / notLike / contains ---
@@ -134,7 +134,7 @@ class QueryBuilderTest {
             from("users")
             where { Column<String>("name", "users") like "John%" }
         }
-        assertEquals("SELECT * FROM users WHERE name LIKE ?", result.sql)
+        assertEquals("SELECT * FROM `users` WHERE `name` LIKE ?", result.sql)
         assertEquals(listOf("John%"), result.args.toList())
     }
 
@@ -144,7 +144,7 @@ class QueryBuilderTest {
             from("users")
             where { Column<String>("name", "users") notLike "Bot%" }
         }
-        assertEquals("SELECT * FROM users WHERE name NOT LIKE ?", result.sql)
+        assertEquals("SELECT * FROM `users` WHERE `name` NOT LIKE ?", result.sql)
     }
 
     @Test
@@ -153,8 +153,27 @@ class QueryBuilderTest {
             from("users")
             where { Column<String>("name", "users") contains "john" }
         }
-        assertEquals("SELECT * FROM users WHERE name LIKE ?", result.sql)
+        assertEquals("SELECT * FROM `users` WHERE `name` LIKE ? ESCAPE '\\'", result.sql)
         assertEquals(listOf("%john%"), result.args.toList())
+    }
+
+    @Test
+    fun `contains escapes LIKE wildcards and the escape character in the value`() {
+        val result = query {
+            from("users")
+            where { Column<String>("name", "users") contains """50%_a\b""" }
+        }
+        assertEquals(listOf("""%50\%\_a\\b%"""), result.args.toList())
+    }
+
+    @Test
+    fun `like keeps its pattern verbatim`() {
+        val result = query {
+            from("users")
+            where { Column<String>("name", "users") like "J_n%" }
+        }
+        assertEquals("SELECT * FROM `users` WHERE `name` LIKE ?", result.sql)
+        assertEquals(listOf("J_n%"), result.args.toList())
     }
 
     // --- WHERE: isNull / isNotNull ---
@@ -165,7 +184,7 @@ class QueryBuilderTest {
             from("users")
             where { Column<String?>("email", "users").isNull() }
         }
-        assertEquals("SELECT * FROM users WHERE email IS NULL", result.sql)
+        assertEquals("SELECT * FROM `users` WHERE `email` IS NULL", result.sql)
         assertEquals(0, result.args.size)
     }
 
@@ -175,19 +194,29 @@ class QueryBuilderTest {
             from("users")
             where { Column<String?>("email", "users").isNotNull() }
         }
-        assertEquals("SELECT * FROM users WHERE email IS NOT NULL", result.sql)
+        assertEquals("SELECT * FROM `users` WHERE `email` IS NOT NULL", result.sql)
     }
 
     // --- WHERE: inList / notInList ---
 
     @Test
-    fun `inList produces IN clause with multiple args`() {
+    fun `inList binds one placeholder per non-integer value`() {
+        val result = query {
+            from("users")
+            where { Column<String>("role", "users") inList listOf("a", "b", "c") }
+        }
+        assertEquals("SELECT * FROM `users` WHERE `role` IN (?,?,?)", result.sql)
+        assertEquals(listOf("a", "b", "c"), result.args.toList())
+    }
+
+    @Test
+    fun `inList inlines integer values instead of binding them`() {
         val result = query {
             from("users")
             where { Column<Int>("role_id", "users") inList listOf(1, 2, 3) }
         }
-        assertEquals("SELECT * FROM users WHERE role_id IN (?,?,?)", result.sql)
-        assertEquals(listOf(1, 2, 3), result.args.toList())
+        assertEquals("SELECT * FROM `users` WHERE `role_id` IN (1,2,3)", result.sql)
+        assertEquals(0, result.args.size)
     }
 
     @Test
@@ -196,7 +225,7 @@ class QueryBuilderTest {
             from("users")
             where { Column<Int>("role_id", "users") notInList listOf(99) }
         }
-        assertEquals("SELECT * FROM users WHERE role_id NOT IN (?)", result.sql)
+        assertEquals("SELECT * FROM `users` WHERE `role_id` NOT IN (99)", result.sql)
     }
 
     @Test
@@ -206,7 +235,7 @@ class QueryBuilderTest {
             from("users")
             where { Column<Int>("role_id", "users") inListIfNotEmpty ids }
         }
-        assertEquals("SELECT * FROM users", result.sql)
+        assertEquals("SELECT * FROM `users`", result.sql)
     }
 
     @Test
@@ -218,7 +247,7 @@ class QueryBuilderTest {
             from("users")
             where { Column<Int>("role_id", "users") inList emptyList() }
         }
-        assertEquals("SELECT * FROM users WHERE role_id IN ()", result.sql)
+        assertEquals("SELECT * FROM `users` WHERE `role_id` IN ()", result.sql)
     }
 
     @Test
@@ -227,7 +256,7 @@ class QueryBuilderTest {
             from("users")
             where { Column<Int>("role_id", "users") inListIfNotEmpty emptyList() }
         }
-        assertEquals("SELECT * FROM users", result.sql)
+        assertEquals("SELECT * FROM `users`", result.sql)
     }
 
     // --- WHERE: between ---
@@ -238,7 +267,7 @@ class QueryBuilderTest {
             from("users")
             where { Column<Int>("age", "users").between(18, 65) }
         }
-        assertEquals("SELECT * FROM users WHERE age BETWEEN ? AND ?", result.sql)
+        assertEquals("SELECT * FROM `users` WHERE `age` BETWEEN ? AND ?", result.sql)
         assertEquals(listOf(18, 65), result.args.toList())
     }
 
@@ -255,7 +284,7 @@ class QueryBuilderTest {
                 Column<Int>("age", "users") lteIfNotNull 65
             }
         }
-        assertEquals("SELECT * FROM users WHERE age <= ?", result.sql)
+        assertEquals("SELECT * FROM `users` WHERE `age` <= ?", result.sql)
         assertEquals(listOf(65), result.args)
     }
 
@@ -270,7 +299,7 @@ class QueryBuilderTest {
                 Column<String>("status", "users") eq "active"
             }
         }
-        assertEquals("SELECT * FROM users WHERE age > ? AND status = ?", result.sql)
+        assertEquals("SELECT * FROM `users` WHERE `age` > ? AND `status` = ?", result.sql)
         assertEquals(listOf(18, "active"), result.args.toList())
     }
 
@@ -287,7 +316,7 @@ class QueryBuilderTest {
                 }
             }
         }
-        assertEquals("SELECT * FROM users WHERE (role = ? OR role = ?)", result.sql)
+        assertEquals("SELECT * FROM `users` WHERE (`role` = ? OR `role` = ?)", result.sql)
         assertEquals(listOf("admin", "mod"), result.args.toList())
     }
 
@@ -303,7 +332,7 @@ class QueryBuilderTest {
                 }
             }
         }
-        assertEquals("SELECT * FROM users WHERE age > ? AND (role = ? OR role = ?)", result.sql)
+        assertEquals("SELECT * FROM `users` WHERE `age` > ? AND (`role` = ? OR `role` = ?)", result.sql)
     }
 
     // --- ORDER BY ---
@@ -314,7 +343,7 @@ class QueryBuilderTest {
             from("users")
             orderBy(Column<String>("name", "users"), SortDirection.ASC)
         }
-        assertEquals("SELECT * FROM users ORDER BY name ASC", result.sql)
+        assertEquals("SELECT * FROM `users` ORDER BY `name` ASC", result.sql)
     }
 
     @Test
@@ -323,7 +352,7 @@ class QueryBuilderTest {
             from("users")
             orderBy(Column<String>("created_at", "users"), SortDirection.DESC)
         }
-        assertEquals("SELECT * FROM users ORDER BY created_at DESC", result.sql)
+        assertEquals("SELECT * FROM `users` ORDER BY `created_at` DESC", result.sql)
     }
 
     @Test
@@ -333,7 +362,7 @@ class QueryBuilderTest {
             orderBy(Column<String>("last_name", "users"), SortDirection.ASC)
             orderBy(Column<String>("first_name", "users"), SortDirection.ASC)
         }
-        assertEquals("SELECT * FROM users ORDER BY last_name ASC, first_name ASC", result.sql)
+        assertEquals("SELECT * FROM `users` ORDER BY `last_name` ASC, `first_name` ASC", result.sql)
     }
 
     @Test
@@ -343,7 +372,7 @@ class QueryBuilderTest {
             from("users")
             orderBy(nameExpression, SortDirection.ASC)
         }
-        assertEquals("SELECT * FROM users ORDER BY name ASC", result.sql)
+        assertEquals("SELECT * FROM `users` ORDER BY `name` ASC", result.sql)
     }
 
     // --- LIMIT / OFFSET ---
@@ -354,7 +383,7 @@ class QueryBuilderTest {
             from("users")
             limit(20)
         }
-        assertEquals("SELECT * FROM users LIMIT 20", result.sql)
+        assertEquals("SELECT * FROM `users` LIMIT 20", result.sql)
     }
 
     @Test
@@ -364,14 +393,20 @@ class QueryBuilderTest {
             limit(20)
             offset(40)
         }
-        assertEquals("SELECT * FROM users LIMIT 20 OFFSET 40", result.sql)
+        assertEquals("SELECT * FROM `users` LIMIT 20 OFFSET 40", result.sql)
     }
 
     @Test
-    fun `non-positive limit throws at build`() {
+    fun `negative limit throws at build`() {
         assertFailsWith<RoomQlException> {
-            query { from("users"); limit(0) }
+            query { from("users"); limit(-1) }
         }
+    }
+
+    @Test
+    fun `limit zero renders LIMIT 0`() {
+        val result = query { from("users"); limit(0) }
+        assertEquals("SELECT * FROM `users` LIMIT 0", result.sql)
     }
 
     @Test
@@ -389,7 +424,7 @@ class QueryBuilderTest {
             from("users")
             groupBy(Column<String>("status", "users"))
         }
-        assertEquals("SELECT * FROM users GROUP BY status", result.sql)
+        assertEquals("SELECT * FROM `users` GROUP BY `status`", result.sql)
     }
 
     @Test
@@ -399,7 +434,7 @@ class QueryBuilderTest {
             groupBy(Column<String>("status", "users"))
             groupBy(Column<String>("region", "users"))
         }
-        assertEquals("SELECT * FROM users GROUP BY status, region", result.sql)
+        assertEquals("SELECT * FROM `users` GROUP BY `status`, `region`", result.sql)
     }
 
     @Test
@@ -409,7 +444,7 @@ class QueryBuilderTest {
             groupBy(Column<String>("status", "users"))
             having { Column<Int>("age", "users") gt 18 }
         }
-        assertEquals("SELECT * FROM users GROUP BY status HAVING age > ?", result.sql)
+        assertEquals("SELECT * FROM `users` GROUP BY `status` HAVING `age` > ?", result.sql)
         assertEquals(listOf(18), result.args.toList())
     }
 
@@ -421,7 +456,7 @@ class QueryBuilderTest {
             groupBy(Column<String>("status", "users"))
             having { ageExpression gt 18 }
         }
-        assertEquals("SELECT * FROM users GROUP BY status HAVING age > ?", result.sql)
+        assertEquals("SELECT * FROM `users` GROUP BY `status` HAVING `age` > ?", result.sql)
         assertEquals(listOf(18), result.args.toList())
     }
 
@@ -444,7 +479,7 @@ class QueryBuilderTest {
             where { Column<Int>("age", "users") gt 18 }
             where { Column<String>("status", "users") eq "active" }
         }
-        assertEquals("SELECT * FROM users WHERE age > ? AND status = ?", result.sql)
+        assertEquals("SELECT * FROM `users` WHERE `age` > ? AND `status` = ?", result.sql)
         assertEquals(listOf(18, "active"), result.args.toList())
     }
 
@@ -466,7 +501,7 @@ class QueryBuilderTest {
             }
         }
         assertEquals(
-            "SELECT id, name, order_id, user_id FROM users INNER JOIN orders ON users.id = orders.user_id",
+            "SELECT `id`, `name`, `order_id`, `user_id` FROM `users` INNER JOIN `orders` ON `users`.`id` = `orders`.`user_id`",
             result.sql
         )
     }
@@ -482,7 +517,7 @@ class QueryBuilderTest {
             }
         }
         assertEquals(
-            "SELECT id, name, profile_id, bio FROM users LEFT JOIN profiles ON users.id = profiles.profile_id",
+            "SELECT `id`, `name`, `profile_id`, `bio` FROM `users` LEFT JOIN `profiles` ON `users`.`id` = `profiles`.`profile_id`",
             result.sql
         )
     }
@@ -502,9 +537,9 @@ class QueryBuilderTest {
             }
         }
         assertEquals(
-            "SELECT id, name, order_id, user_id, item_id, order_ref FROM users" +
-                " INNER JOIN orders ON users.id = orders.user_id" +
-                " LEFT JOIN items ON orders.order_id = items.order_ref",
+            "SELECT `id`, `name`, `order_id`, `user_id`, `item_id`, `order_ref` FROM `users`" +
+                " INNER JOIN `orders` ON `users`.`id` = `orders`.`user_id`" +
+                " LEFT JOIN `items` ON `orders`.`order_id` = `items`.`order_ref`",
             result.sql
         )
     }
@@ -520,8 +555,8 @@ class QueryBuilderTest {
             }
         }
         assertEquals(
-            "SELECT users.id AS users__id, name, orders.id AS orders__id, user_id, amount" +
-                " FROM users INNER JOIN orders ON users.id = orders.user_id",
+            "SELECT `users`.`id` AS `users__id`, `name`, `orders`.`id` AS `orders__id`, `user_id`, `amount`" +
+                " FROM `users` INNER JOIN `orders` ON `users`.`id` = `orders`.`user_id`",
             result.sql
         )
     }
@@ -538,7 +573,7 @@ class QueryBuilderTest {
         }
         val sql = result.sql
         assertTrue("AS" !in sql, "Non-conflicting columns should not be aliased: $sql")
-        assertTrue("SELECT id, name, address_id, city" in sql)
+        assertTrue("SELECT `id`, `name`, `address_id`, `city`" in sql)
     }
 
     @Test
@@ -565,9 +600,9 @@ class QueryBuilderTest {
             where { Column<String>("status", "orders") eq "active" }
         }
         assertEquals(
-            "SELECT id, name, order_id, user_id, status" +
-                " FROM users INNER JOIN orders ON users.id = orders.user_id" +
-                " WHERE status = ?",
+            "SELECT `id`, `name`, `order_id`, `user_id`, `status`" +
+                " FROM `users` INNER JOIN `orders` ON `users`.`id` = `orders`.`user_id`" +
+                " WHERE `status` = ?",
             result.sql
         )
         assertEquals(listOf("active"), result.args.toList())
@@ -585,10 +620,10 @@ class QueryBuilderTest {
             where { Column<String>("status", "orders") eq "active" }
         }
         assertEquals(
-            "SELECT users.id AS users__id, name, users.status AS users__status," +
-                " orders.id AS orders__id, user_id, orders.status AS orders__status" +
-                " FROM users INNER JOIN orders ON users.id = orders.user_id" +
-                " WHERE orders.status = ?",
+            "SELECT `users`.`id` AS `users__id`, `name`, `users`.`status` AS `users__status`," +
+                " `orders`.`id` AS `orders__id`, `user_id`, `orders`.`status` AS `orders__status`" +
+                " FROM `users` INNER JOIN `orders` ON `users`.`id` = `orders`.`user_id`" +
+                " WHERE `orders`.`status` = ?",
             result.sql
         )
         assertEquals(listOf("active"), result.args.toList())
@@ -606,8 +641,8 @@ class QueryBuilderTest {
             groupBy(Column<Long>("id", "users"))
             orderBy(Column<Long>("id", "orders"), SortDirection.ASC)
         }
-        assertTrue("GROUP BY users.id" in result.sql)
-        assertTrue("ORDER BY orders.id ASC" in result.sql)
+        assertTrue("GROUP BY `users`.`id`" in result.sql)
+        assertTrue("ORDER BY `orders`.`id` ASC" in result.sql)
     }
 
     @Test
@@ -622,7 +657,7 @@ class QueryBuilderTest {
             groupBy(Column<Long>("id", "users"))
             having { Column<Long>("id", "orders") gt 5L }
         }
-        assertTrue("HAVING orders.id > ?" in result.sql)
+        assertTrue("HAVING `orders`.`id` > ?" in result.sql)
     }
 
     @Test
@@ -636,7 +671,7 @@ class QueryBuilderTest {
             }
             where { Column<Double>("amount", "orders") gt 100.0 }
         }
-        assertTrue("WHERE amount > ?" in result.sql)
+        assertTrue("WHERE `amount` > ?" in result.sql)
     }
 
     // --- Full query combining multiple clauses ---
@@ -654,7 +689,7 @@ class QueryBuilderTest {
             offset(40)
         }
         assertEquals(
-            "SELECT * FROM users WHERE age > ? AND status = ? ORDER BY name ASC LIMIT 20 OFFSET 40",
+            "SELECT * FROM `users` WHERE `age` > ? AND `status` = ? ORDER BY `name` ASC LIMIT 20 OFFSET 40",
             result.sql
         )
         assertEquals(listOf(18, "active"), result.args.toList())

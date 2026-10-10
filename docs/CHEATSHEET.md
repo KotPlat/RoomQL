@@ -13,9 +13,9 @@ Most of this maps 1:1 onto SQL you already know (`eq`→`=`, `gt`→`>`, `count`
 | Require a filter always | `eq`, `notEq`, `gt`, `gte`, `lt`, `lte` | `col = ?`, `col != ?`, `col > ?`, `col >= ?`, `col < ?`, `col <= ?` |
 | Skip a filter when the value is `null` | `eqIfNotNull`, `notEqIfNotNull`, `gtIfNotNull`, `gteIfNotNull`, `ltIfNotNull`, `lteIfNotNull` | same, or dropped entirely |
 | Match `NULL` itself | `isNull`, `isNotNull` | `col IS NULL`, `col IS NOT NULL` |
-| Require a text match | `like`, `notLike`, `contains` | `col LIKE ?` (verbatim pattern), `col NOT LIKE ?`, `col LIKE ?` (auto-wrapped in `%`) |
+| Require a text match | `like`, `notLike`, `contains` | `col LIKE ?` (verbatim pattern), `col NOT LIKE ?`, `col LIKE ? ESCAPE '\'` (auto-wrapped in `%`; `%`/`_` in the text match literally) |
 | Skip a text match when the value is `null` | `likeIfNotNull`, `notLikeIfNotNull`, `containsIfNotNull` | same, or dropped entirely |
-| Require set membership | `inList`, `notInList` | `col IN (?,?)` (empty list → matches **nothing**), `col NOT IN (?)` (empty list → matches **everything**) |
+| Require set membership | `inList`, `notInList` | `col IN (?,?)`, with integers inlined as `col IN (1,2)` (empty list → matches **nothing**), `col NOT IN (?)` (empty list → matches **everything**) |
 | Skip set membership when the list is `null` or empty | `inListIfNotEmpty`, `notInListIfNotEmpty` | same, or dropped entirely |
 | Require a range | `between(lower, upper)` | `col BETWEEN ? AND ?` — both bounds required, no `IfNotNull` form |
 | Allow either bound of a range to be absent | compose `gteIfNotNull` + `lteIfNotNull` | whichever bound is present, independently |
@@ -33,7 +33,7 @@ Most of this maps 1:1 onto SQL you already know (`eq`→`=`, `gt`→`>`, `count`
 |---|---|
 | Sort by one or more columns | `orderBy(expr, SortDirection.ASC / .DESC)` — call repeatedly for a multi-column sort |
 | Sort by an aggregate | `orderBy(count(...), SortDirection.DESC)` — `orderBy` takes any `Expression<T>` |
-| Page results | `limit(n)` (must be positive), `offset(n)` (requires `limit`) |
+| Page results | `limit(n)` (`0` returns no rows; negative throws), `offset(n)` (requires `limit`) |
 | Group rows | `groupBy(column)` — call repeatedly for a multi-column `GROUP BY` |
 | Filter a group | `having { ... }` — requires `groupBy(...)` to be set |
 
@@ -82,7 +82,7 @@ Joining requires `from(EntityTable)` (not the raw-string `from(String)` overload
 | Mistake | `RoomQlException` message |
 |---|---|
 | No `from()` | `from() must be called before build()` |
-| `limit(0)` or negative | `limit() must be a positive integer, got 0` |
+| Negative `limit()` | `limit() must not be negative, got -1` |
 | `offset()` without `limit()` | `offset() requires limit() to be set` |
 | `having { }` without `groupBy()` | `having() requires groupBy() to be set` |
 | `join()` after `from(String)` | `join() requires from(EntityTable) so columns can be aliased; from(String) has no column metadata` |
@@ -90,5 +90,10 @@ Joining requires `from(EntityTable)` (not the raw-string `from(String)` overload
 | `select(...)` mixing an aggregate with a bare column, ungrouped | `select(...) cannot mix an aggregate with a bare column unless groupBy() is set` |
 | `alias()` name containing a backtick | `alias() names cannot contain a backtick: <names>` |
 | `select(...)` items sharing an output name | `select(...) returns more than one column named: <names>; alias all but one` |
+| A table or column name containing a backtick | `table and column names cannot contain a backtick: <name>` |
+| The same table twice in `from()`/`join()` (a self-join) | `table <name> appears more than once in from()/join(); self-joins aren't supported yet` |
+| A column from a table not in `from()`/`join()` | `column(s) from a table not in from()/join(): <table.column>` |
+| `select(...)` with several items and an unaliased aggregate | `select(...) with more than one item needs an alias on each aggregate, or Room can't map it: <aggregates>` |
+| A value only a `@TypeConverter` can store (`Date`, `Instant`, …) | `can't bind the value given to <table.column>: its type is one Room stores through a @TypeConverter, …` |
 
 Full detail on every entry above, including exact signatures and more generated-SQL examples, is in the [API Reference](API.md) and [Usage Guide](USAGE.md).

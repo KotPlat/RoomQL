@@ -37,6 +37,12 @@ class RoomQlProcessorTest {
         return compilation.compile() to compilation
     }
 
+    private fun javaFixture(fileName: String): SourceFile {
+        val resource = javaClass.classLoader.getResource("fixtures/$fileName")
+            ?: error("Fixture not found: fixtures/$fileName")
+        return SourceFile.java(fileName, resource.readText())
+    }
+
     private fun findGeneratedFile(compilation: KotlinCompilation, name: String): File =
         compilation.kspSourcesDir.walkTopDown().first { it.isFile && it.name == name }
 
@@ -144,6 +150,56 @@ class RoomQlProcessorTest {
         assertTrue("fullNameCache" !in generated)
         assertTrue(""""id"""" in generated)
         assertTrue(""""name"""" in generated)
+    }
+
+    // --- Room's stored-column rules: @Embedded, computed, transient ---
+
+    @Test
+    fun `Embedded properties flatten into prefixed columns under nested objects`() {
+        val usage = SourceFile.kotlin(
+            "Usage.kt",
+            """
+            package test
+            import com.roomql.runtime.Column
+            val street: Column<String> = CustomerEntityTable.address.street
+            val city: Column<String> = CustomerEntityTable.address.city
+            val lat: Column<Double> = CustomerEntityTable.address.geo.lat
+            val phone: Column<String?> = CustomerEntityTable.contact.phone
+            val throughValue: Column<Double> = CustomerEntityTable.let { it.address.geo.lng }
+            """.trimIndent(),
+        )
+
+        val (result, compilation) = compile(fixture("EmbeddedEntity.kt"), usage)
+
+        assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode)
+        val table = result.classLoader.loadClass("test.CustomerEntityTable").getField("INSTANCE").get(null)
+            as com.roomql.runtime.EntityTable
+        assertEquals(
+            listOf("id", "addr_street", "addr_city_name", "addr_geo_lat", "addr_geo_lng", "phone"),
+            table.allColumnNames,
+        )
+        val generated = findGeneratedFile(compilation, "CustomerEntityTable.kt").readText()
+        assertTrue(""""addr_geo_lat", "customers"""" in generated, generated)
+    }
+
+    @Test
+    fun `computed and transient properties are not columns`() {
+        val (result, compilation) = compile(fixture("EmbeddedEntity.kt"))
+
+        assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode)
+        val generated = findGeneratedFile(compilation, "CustomerEntityTable.kt").readText()
+        assertTrue("label" !in generated, generated)
+        assertTrue("cache" !in generated, generated)
+    }
+
+    @Test
+    fun `Java entity skips static, plain transient and Ignore'd fields like Room does`() {
+        val (result, _) = compile(javaFixture("AccountEntity.java"))
+
+        assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode)
+        val table = result.classLoader.loadClass("test.AccountEntityTable").getField("INSTANCE").get(null)
+            as com.roomql.runtime.EntityTable
+        assertEquals(listOf("id", "display_name", "kept"), table.allColumnNames)
     }
 
     // --- generated object implements EntityTable ---

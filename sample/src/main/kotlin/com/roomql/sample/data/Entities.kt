@@ -10,7 +10,7 @@ import androidx.room.PrimaryKey
  * Note that [BrandEntity] deliberately carries `id` and `name`, both of which collide
  * with [ProductEntity]'s. That collision is the point, not an oversight: it is what
  * makes the faceted screen exercise RoomQL's automatic `table__column` aliasing, where
- * a joined query emits `products.id AS products__id` so a cursor cannot silently
+ * a joined query emits `` `products`.`id` AS `products__id` `` so a cursor cannot silently
  * overwrite one column with another. Renaming them apart would delete the feature this
  * demo exists to show.
  */

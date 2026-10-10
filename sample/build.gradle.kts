@@ -10,6 +10,7 @@ android {
 
     defaultConfig {
         minSdk = 21
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     compileOptions {
@@ -39,6 +40,8 @@ dependencies {
     // RoomQl KSP processor generates the *Table objects; Room's KSP generates DAO_Impl.
     ksp(project(":ksp-processor"))
     ksp(libs.room.compiler)
+    kspTest(project(":ksp-processor"))
+    kspTest(libs.room.compiler)
 
     // Robolectric drives a real in-memory Room DB on the JVM. It mandates the JUnit4
     // runner (@RunWith(RobolectricTestRunner)), so this module uses JUnit4 rather than
@@ -48,4 +51,9 @@ dependencies {
     testImplementation(libs.coroutines.test)
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)
+
+    // Instrumented tests run on a device or emulator for what Robolectric can't reproduce, e.g. API 30's SQLite.
+    androidTestImplementation(libs.kotlin.test)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.ext.junit)
 }

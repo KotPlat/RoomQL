@@ -123,8 +123,8 @@ class FlagshipSearchTest {
         // The concrete difference the demo claims: RoomQL's statement shrinks with the
         // filters, the IS NULL OR statement does not.
         val roomQlSql = roomQl.search(oneFilter).sql
-        assertTrue(roomQlSql.contains("category = ?"))
-        assertTrue("RoomQL should not mention unused columns", !roomQlSql.contains("rating >="))
+        assertTrue(roomQlSql, roomQlSql.contains("`category` = ?"))
+        assertTrue("RoomQL should not mention unused columns", !roomQlSql.contains("`rating` >="))
 
         val isNullOrSql = isNullOr.search(oneFilter).sql
         assertTrue("IS NULL OR always ships every clause", isNullOrSql.contains("rating >="))
