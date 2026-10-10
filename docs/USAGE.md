@@ -1,6 +1,6 @@
 # RoomQL Usage Guide — building dynamic Android Room queries in Kotlin
 
-This guide walks through the **RoomQL 2.0.0** DSL one task at a time. Every example shows the **Kotlin you write** and the **SQL RoomQL generates**, so you always know exactly what reaches SQLite.
+This guide walks through the **RoomQL 2.0.1** DSL one task at a time. Every example shows the **Kotlin you write** and the **SQL RoomQL generates**, so you always know exactly what reaches SQLite.
 
 It starts from an empty project: [Installation](#installation) covers everything you need to add. For the pitch, API reference, and limitations, see the [main README](../README.md).
 
@@ -81,7 +81,7 @@ With a version catalog (`gradle/libs.versions.toml`):
 
 ```toml
 [versions]
-roomql = "2.0.0"
+roomql = "2.0.1"
 
 [libraries]
 roomql-runtime-android = { module = "io.github.kotplat.roomql:runtime-android", version.ref = "roomql" }
@@ -100,8 +100,8 @@ Or without a catalog:
 
 ```kotlin
 dependencies {
-    implementation("io.github.kotplat.roomql:runtime-android:2.0.0")
-    ksp("io.github.kotplat.roomql:ksp-processor:2.0.0")
+    implementation("io.github.kotplat.roomql:runtime-android:2.0.1")
+    ksp("io.github.kotplat.roomql:ksp-processor:2.0.1")
 }
 ```
 
@@ -133,7 +133,7 @@ For example, a pure-Kotlin module that only builds queries, or plain JVM tests o
 
 ```kotlin
 dependencies {
-    implementation("io.github.kotplat.roomql:runtime:2.0.0")
+    implementation("io.github.kotplat.roomql:runtime:2.0.1")
 }
 ```
 

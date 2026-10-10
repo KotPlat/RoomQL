@@ -4,7 +4,7 @@ All notable changes to **RoomQL** are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and RoomQL follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.1] - 2026-10-10
 
 ### Fixed
 
@@ -173,5 +173,6 @@ and deferred are documented in the closed issues
 [#6](https://github.com/KotPlat/RoomQL/issues/6) and
 [#13](https://github.com/KotPlat/RoomQL/issues/13).
 
+[2.0.1]: https://github.com/KotPlat/RoomQL/releases/tag/2.0.1
 [2.0.0]: https://github.com/KotPlat/RoomQL/releases/tag/2.0.0
 [1.0.0]: https://github.com/KotPlat/RoomQL/releases/tag/1.0.0

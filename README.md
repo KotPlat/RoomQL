@@ -41,7 +41,7 @@ Declare the version catalog entries (`gradle/libs.versions.toml`):
 
 ```toml
 [versions]
-roomql = "2.0.0"
+roomql = "2.0.1"
 
 [libraries]
 roomql-runtime-android = { module = "io.github.kotplat.roomql:runtime-android", version.ref = "roomql" }
