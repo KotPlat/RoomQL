@@ -814,7 +814,7 @@ Every case that throws:
 | The same table twice in `from()`/`join()` (a self-join) | `table <name> appears more than once in from()/join(); self-joins aren't supported yet` |
 | A column from a table not in `from()`/`join()` | `column(s) from a table not in from()/join(): <table.column>` |
 | `select(...)` with several items and an unaliased aggregate | `select(...) with more than one item needs an alias on each aggregate, or Room can't map it: <aggregates>` |
-| A value only a `@TypeConverter` can store (`Date`, `Instant`, …) | `can't bind a <type> to <table.column>: Room stores it through a @TypeConverter, …` |
+| A value only a `@TypeConverter` can store (`Date`, `Instant`, …) | `can't bind the value given to <table.column>: its type is one Room stores through a @TypeConverter, …` |
 | More than 999 bound values | `query binds <n> values, but SQLite on Android API 30 and below allows at most 999. …` |
 
 **Why unchecked?** These are bugs in how the query is written, not bad user input. A wrong query is wrong every time it runs, so it fails the first time you hit that code path, usually during development. You don't need a `try`/`catch` around every query.
@@ -968,7 +968,7 @@ Declare every field that comes from the left-joined table as nullable, for examp
 
 Over zero rows, `SUM`, `MIN` and `MAX` return `NULL`. Into a non-null `Long` return type, Room maps that `NULL` to `0` without telling you. Declare the DAO method's return type nullable (`Long?`) to tell "no rows" apart from a real `0`.
 
-### Why does build() throw "can't bind a ... Room stores it through a @TypeConverter"?
+### Why does build() throw "can't bind the value given to ..."?
 
 RoomQL binds enums, `UUID` and `Char` the way Room stores them. It can't apply your own `@TypeConverter`s, so a `Column<Date>` value can't be bound. Filter on the stored form with a matching column instead: `Column<Long>("created_at", "users") gte date.time`.
 

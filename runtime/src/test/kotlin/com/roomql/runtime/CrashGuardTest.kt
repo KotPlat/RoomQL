@@ -58,7 +58,7 @@ class CrashGuardTest {
         val e = assertFailsWith<RoomQlException> {
             query { from("users"); where { Column<Date>("created", "users") gt Date(0) } }
         }
-        assertTrue("java.util.Date" in e.message!! && "users.created" in e.message!!, e.message)
+        assertTrue("users.created" in e.message!! && "@TypeConverter" in e.message!!, e.message)
     }
 
     @Test
