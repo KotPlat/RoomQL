@@ -15,8 +15,8 @@ All notable changes to **RoomQL** are documented here. The format follows
 - **Reserved-word table and column names work.** Every identifier is backtick-quoted, as Room's
   own SQL is; a name containing a backtick throws. See #89.
 - **Large integer `inList`/`notInList` no longer hit SQLite's 999-argument cap on API 30 and
-  below.** Integer values are inlined into the SQL; a query still binding more than 999 values
-  throws at `build()`. See #90.
+  below.** Integer values are inlined into the SQL. Other values still bind, and past 999 they
+  fail in SQLite on those devices, as before. See #90.
 - **The KSP processor generates only real columns.** Computed, `@Transient` and `@Relation`
   properties are skipped, and `@Embedded` properties expand into their prefixed columns as a
   nested group (`UserEntityTable.address.city`). See #91.

@@ -95,6 +95,5 @@ Joining requires `from(EntityTable)` (not the raw-string `from(String)` overload
 | A column from a table not in `from()`/`join()` | `column(s) from a table not in from()/join(): <table.column>` |
 | `select(...)` with several items and an unaliased aggregate | `select(...) with more than one item needs an alias on each aggregate, or Room can't map it: <aggregates>` |
 | A value only a `@TypeConverter` can store (`Date`, `Instant`, …) | `can't bind the value given to <table.column>: its type is one Room stores through a @TypeConverter, …` |
-| More than 999 bound values | `query binds <n> values, but SQLite on Android API 30 and below allows at most 999. …` |
 
 Full detail on every entry above, including exact signatures and more generated-SQL examples, is in the [API Reference](API.md) and [Usage Guide](USAGE.md).

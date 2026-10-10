@@ -99,20 +99,12 @@ class CrashGuardTest {
         assertFailsWith<RoomQlException> { query { from("us`ers") } }
     }
 
-    // --- #90: bind-argument cap ---
+    // --- #90: integer lists stay under SQLite's bind-argument cap ---
 
     @Test
-    fun `999 bound values are allowed`() {
-        val result = query { from("users"); where { Column<String>("name", "users") inList List(999) { "n$it" } } }
-        assertEquals(999, result.args.size)
-    }
-
-    @Test
-    fun `more than 999 bound values throws`() {
-        val e = assertFailsWith<RoomQlException> {
-            query { from("users"); where { Column<String>("name", "users") inList List(1000) { "n$it" } } }
-        }
-        assertTrue("1000" in e.message!!, e.message)
+    fun `more than 999 bound values still build, leaving the cap to SQLite`() {
+        val result = query { from("users"); where { Column<String>("name", "users") inList List(1000) { "n$it" } } }
+        assertEquals(1000, result.args.size)
     }
 
     @Test

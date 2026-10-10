@@ -7,7 +7,6 @@ import androidx.sqlite.db.SimpleSQLiteQuery
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.roomql.android.toQuery
-import com.roomql.runtime.RoomQlException
 import com.roomql.runtime.query
 import com.roomql.sample.data.AppDatabase
 import com.roomql.sample.data.CatalogueSeed
@@ -61,9 +60,8 @@ class BindLimitDeviceTest {
     }
 
     @Test
-    fun stringInListOf1000FailsInBuildNotOnDevice() {
-        assertThrows(RoomQlException::class.java) {
-            query { from(ProductEntityTable); where { ProductEntityTable.name inList List(1000) { "n$it" } } }
-        }
+    fun stringInListOf1000IsRejectedBySqlite() {
+        val q = query { from(ProductEntityTable); where { ProductEntityTable.name inList List(1000) { "n$it" } } }
+        assertThrows(SQLiteException::class.java) { db.productDao().search(q.toQuery()) }
     }
 }

@@ -19,7 +19,7 @@ class BindLimitSqliteTest {
     @BeforeTest
     fun setUp() {
         connection = DriverManager.getConnection("jdbc:sqlite::memory:") as SQLiteConnection
-        connection.setLimit(SQLiteLimits.SQLITE_LIMIT_VARIABLE_NUMBER, MAX_BIND_ARGS)
+        connection.setLimit(SQLiteLimits.SQLITE_LIMIT_VARIABLE_NUMBER, 999)
         connection.createStatement().use { it.execute("CREATE TABLE users (id INTEGER, name TEXT)") }
         connection.createStatement().use { it.execute("INSERT INTO users VALUES (1, 'n1'), (4999, 'n4999')") }
     }
@@ -50,9 +50,10 @@ class BindLimitSqliteTest {
     }
 
     @Test
-    fun `1000 bound strings fail in build, before SQLite`() {
-        assertFailsWith<RoomQlException> {
-            query { from("users"); where { Column<String>("name", "users") inList List(1000) { "n$it" } } }
+    fun `1000 bound strings are left for SQLite to reject`() {
+        val e = assertFailsWith<SQLException> {
+            count(query { from("users"); where { Column<String>("name", "users") inList List(1000) { "n$it" } } })
         }
+        assertTrue("too many SQL variables" in e.message!!, e.message)
     }
 }

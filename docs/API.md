@@ -91,7 +91,7 @@ The receiver inside `query { }`. Marked `@RoomQlDsl`, so outer-scope members can
 | `notLikeIfNotNull` | `infix fun <T : String?> Column<T>.notLikeIfNotNull(value: String?)` | `col NOT LIKE ?`, or skipped |
 | `contains` | `infix fun <T : String?> Column<T>.contains(value: String)` | `col LIKE ? ESCAPE '\'`, bound as `%value%` with `%`, `_` and `\` in `value` escaped |
 | `containsIfNotNull` | `infix fun <T : String?> Column<T>.containsIfNotNull(value: String?)` | Same as `contains`, or skipped |
-| `inList` | `infix fun <T> Column<T>.inList(values: List<T & Any>)` | `col IN (?,?)`, or `col IN (1,2)` for integers, which are inlined so a long ID list stays under SQLite's 999-argument cap; an empty list renders `col IN ()`, which SQLite defines as matching nothing |
+| `inList` | `infix fun <T> Column<T>.inList(values: List<T & Any>)` | `col IN (?,?)`, or `col IN (1,2)` for integers, which are inlined so a long ID list stays under the 999-argument cap SQLite has on API 30 and below (a longer list of other values fails there with `too many SQL variables`); an empty list renders `col IN ()`, which SQLite defines as matching nothing |
 | `inListIfNotEmpty` | `infix fun <T> Column<T>.inListIfNotEmpty(values: List<T & Any>?)` | `col IN (?,?)`, or skipped if the list is `null` or empty |
 | `notInList` | `infix fun <T> Column<T>.notInList(values: List<T & Any>)` | `col NOT IN (?)`; an empty list renders `col NOT IN ()`, which SQLite defines as matching everything |
 | `notInListIfNotEmpty` | `infix fun <T> Column<T>.notInListIfNotEmpty(values: List<T & Any>?)` | `col NOT IN (?)`, or skipped if the list is `null` or empty |
@@ -313,7 +313,6 @@ Thrown by `build()` — and therefore by `query { }` — when the configured que
 | A column from a table not in `from()`/`join()` | `column(s) from a table not in from()/join(): <table.column>` |
 | `select(...)` with several items and an unaliased aggregate | `select(...) with more than one item needs an alias on each aggregate, or Room can't map it: <aggregates>` |
 | A value only a `@TypeConverter` can store (`Date`, `Instant`, …) | `can't bind the value given to <table.column>: its type is one Room stores through a @TypeConverter, …` |
-| More than 999 bound values | `query binds <n> values, but SQLite on Android API 30 and below allows at most 999. …` |
 
 ---
 

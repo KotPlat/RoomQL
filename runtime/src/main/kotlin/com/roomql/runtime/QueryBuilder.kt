@@ -129,10 +129,6 @@ public class QueryBuilder {
             offsetValue?.let { append(" OFFSET $it") }
         }
 
-        roomQlCheck(args.size <= MAX_BIND_ARGS) {
-            "query binds ${args.size} values, but SQLite on Android API 30 and below allows at most $MAX_BIND_ARGS. " +
-                "Integer inList() values are inlined and don't count; split other large lists across queries"
-        }
         return RoomQlQuery(sql, args)
     }
 

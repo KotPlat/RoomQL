@@ -3,9 +3,6 @@ package com.roomql.runtime
 import java.nio.ByteBuffer
 import java.util.UUID
 
-/** SQLite's bind-argument cap on Android API 30 and below (SQLite < 3.32). */
-internal const val MAX_BIND_ARGS = 999
-
 /** Converts [value] into the form Room itself stores, or throws for a type only a `@TypeConverter` can store; reflection-free, so no type name. */
 internal fun toBindable(value: Any?, expression: Expression<*>): Any? = when (value) {
     null, is String, is Long, is Int, is Short, is Byte, is Double, is Float, is Boolean, is ByteArray -> value
